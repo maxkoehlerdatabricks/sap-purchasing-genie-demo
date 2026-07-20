@@ -85,14 +85,23 @@ INSTRUCTIONS = (
 
 
 def mas_find_by_name(name):
+    # MAS tiles are discovered via the /api/2.0/tiles listing endpoint (filtered to
+    # MAS tiles by name), NOT the multi-agent-supervisors endpoint.
+    page_token = None
     try:
-        resp = _do("GET", "/api/2.0/multi-agent-supervisors")
+        while True:
+            params = {"filter": f"name_contains={name}&&tile_type=MAS"}
+            if page_token:
+                params["page_token"] = page_token
+            resp = _do("GET", "/api/2.0/tiles", params=params)
+            for t in (resp.get("tiles") or []):
+                if t.get("name") == name:
+                    return t.get("tile_id")
+            page_token = resp.get("next_page_token")
+            if not page_token:
+                break
     except Exception:
         return None
-    for t in (resp.get("multi_agent_supervisors") or resp.get("tiles") or []):
-        tile = t.get("tile", t)
-        if tile.get("name") == name:
-            return tile.get("tile_id")
     return None
 
 
