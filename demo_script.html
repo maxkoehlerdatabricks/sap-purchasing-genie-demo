@@ -8,189 +8,250 @@
   :root { --red:#FF3621; --navy:#1B3139; --green:#00A972; --amber:#FFAB00; --blue:#2272B4; --bg:#f6f7f9; }
   * { box-sizing:border-box; }
   body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--navy); background:var(--bg); line-height:1.55; }
-  .wrap { max-width:960px; margin:0 auto; padding:0 24px 80px; }
-  header.hero { background:linear-gradient(135deg,#1B3139,#2272B4); color:#fff; padding:48px 24px; }
-  header.hero .wrap { padding-bottom:24px; }
+  .wrap { max-width:980px; margin:0 auto; padding:0 24px 80px; }
+  header.hero { background:linear-gradient(135deg,#1B3139,#2272B4); color:#fff; padding:44px 24px; }
+  header.hero .wrap { padding-bottom:20px; }
   header.hero h1 { margin:0 0 8px; font-size:30px; }
-  header.hero p { margin:4px 0; opacity:.9; }
+  header.hero p { margin:4px 0; opacity:.92; }
   .pill { display:inline-block; background:rgba(255,255,255,.15); border-radius:14px; padding:3px 10px; font-size:12px; margin:6px 6px 0 0; }
-  h2 { color:var(--red); border-bottom:2px solid #eaecef; padding-bottom:6px; margin-top:40px; }
-  h3 { margin-top:26px; }
-  code, pre { font-family:ui-monospace,Menlo,Consolas,monospace; }
-  pre { background:#0f1720; color:#e6edf3; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:13px; }
+  h2 { color:var(--red); border-bottom:2px solid #eaecef; padding-bottom:6px; margin-top:42px; font-size:22px; }
+  h2 .clock { float:right; font-size:13px; color:#8a9aa2; font-weight:400; }
+  h3 { margin-top:24px; font-size:17px; }
   code.inline { background:#eef2f4; padding:1px 6px; border-radius:4px; font-size:.9em; }
   table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.07); }
-  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid #eef1f3; font-size:14px; }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid #eef1f3; font-size:14px; vertical-align:top; }
   th { background:#f0f3f5; }
-  .step { background:#fff; border-left:4px solid var(--red); border-radius:8px; padding:16px 20px; margin:16px 0; box-shadow:0 1px 3px rgba(0,0,0,.07); }
-  .step .n { display:inline-block; background:var(--red); color:#fff; border-radius:50%; width:26px; height:26px; text-align:center; line-height:26px; font-weight:700; margin-right:8px; }
+  ol.clicks { counter-reset:step; list-style:none; padding-left:0; }
+  ol.clicks > li { position:relative; background:#fff; border-radius:8px; padding:14px 18px 14px 52px; margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+  ol.clicks > li::before { counter-increment:step; content:counter(step); position:absolute; left:14px; top:14px; background:var(--red); color:#fff; border-radius:50%; width:26px; height:26px; text-align:center; line-height:26px; font-weight:700; font-size:14px; }
+  .click-label { display:inline-block; background:var(--navy); color:#fff; border-radius:5px; padding:2px 8px; font-size:12px; margin-right:6px; letter-spacing:.3px; }
   .say { border-left:4px solid var(--green); background:#f0fbf6; padding:10px 14px; border-radius:6px; margin:10px 0; }
   .say::before { content:"🗣  Say: "; font-weight:700; color:var(--green); }
+  .show { border-left:4px solid var(--blue); background:#eef5fb; padding:10px 14px; border-radius:6px; margin:10px 0; }
+  .show::before { content:"👁  Point out: "; font-weight:700; color:var(--blue); }
   .tip { border-left:4px solid var(--amber); background:#fff9ea; padding:10px 14px; border-radius:6px; margin:10px 0; font-size:14px; }
-  .toc a { color:var(--blue); text-decoration:none; }
-  .toc li { margin:4px 0; }
-  .q { font-weight:600; color:var(--navy); }
-  .badge { background:var(--green); color:#fff; border-radius:6px; padding:2px 8px; font-size:12px; }
+  .tip::before { content:"💡  "; }
+  .ask { font-weight:600; color:var(--navy); background:#fdeeec; border:1px dashed var(--red); border-radius:6px; padding:6px 10px; display:inline-block; margin:2px 0; }
+  .toc a { color:var(--blue); text-decoration:none; } .toc li { margin:5px 0; }
+  .lead { font-size:16px; }
+  .setup { background:#fff; border-radius:8px; padding:14px 18px; box-shadow:0 1px 3px rgba(0,0,0,.07); font-size:14px; }
 </style>
 </head>
 <body>
 <header class="hero">
   <div class="wrap">
     <h1>SAP Purchasing — Sourcing Risk &amp; PO Analytics</h1>
-    <p>End-to-end Databricks demo: 13 simulated SAP tables → 5 governed gold tables → 2 Genie spaces → Agent Bricks Multi-Agent Supervisor → App.</p>
-    <p>Persona: <strong>purchasing business analyst</strong> answering sourcing-risk &amp; supply-continuity questions — without SAP access.</p>
+    <p class="lead">A UI-first demo walkthrough on Databricks.</p>
+    <p>Persona: a <strong>purchasing business analyst</strong> answering sourcing-risk &amp;
+    supply-continuity questions in plain English — without SAP access.</p>
     <div>
-      <span class="pill">Unity Catalog</span>
-      <span class="pill">Metric Views</span>
-      <span class="pill">Trusted SQL Functions</span>
+      <span class="pill">Catalog Explorer</span>
       <span class="pill">Genie ×2</span>
-      <span class="pill">Agent Bricks MAS</span>
+      <span class="pill">Metric Views</span>
+      <span class="pill">Agent Bricks (MAS)</span>
       <span class="pill">Databricks App</span>
-      <span class="pill">Serverless</span>
     </div>
   </div>
 </header>
 
 <div class="wrap">
 
-  <h2 id="toc">Contents</h2>
+  <p class="lead" style="margin-top:26px;">This script is a <strong>click-through of the Databricks
+  UI</strong>. Each step says exactly where to click, what to say, and what to point out. Total run
+  time ~20 minutes. You can stop after any section.</p>
+
+  <h2 id="toc">Flow <span class="clock">~20 min</span></h2>
   <ol class="toc">
-    <li><a href="#story">The business story (2 min)</a></li>
-    <li><a href="#data">The data model — 13 raw → 5 gold (3 min)</a></li>
-    <li><a href="#semantics">Governed semantics: functions, metric views, value dictionary (3 min)</a></li>
-    <li><a href="#genie">Genie spaces — natural-language sourcing risk (5 min)</a></li>
-    <li><a href="#mas">Agent Bricks Multi-Agent Supervisor (3 min)</a></li>
-    <li><a href="#app">The App — visualizations + chat (4 min)</a></li>
-    <li><a href="#benchmark">Trust &amp; accuracy — the benchmark (2 min)</a></li>
-    <li><a href="#questions">The 11 business questions (reference)</a></li>
+    <li><a href="#hook">The hook — a $2M question (1 min)</a></li>
+    <li><a href="#catalog">Catalog Explorer — the governed data model (4 min)</a></li>
+    <li><a href="#genie1">Genie: Sourcing &amp; Supplier Risk (5 min)</a></li>
+    <li><a href="#genie2">Genie: Purchase Order Analytics (3 min)</a></li>
+    <li><a href="#mas">Agent Bricks — the Multi-Agent Supervisor (3 min)</a></li>
+    <li><a href="#app">The App — one screen for the business (4 min)</a></li>
+    <li><a href="#close">Close — trust &amp; what it took (1 min)</a></li>
   </ol>
 
-  <h2 id="story">1 · The business story</h2>
-  <div class="say">An automotive OEM buys thousands of parts from hundreds of suppliers. If a
-  critical part is <em>single-sourced</em> and that one supplier has a delivery-risk flag, the
-  line can stop. Today that analysis lives in SAP and needs specialist access. We've lifted
-  the purchasing data into Databricks so <strong>any analyst can ask these questions in plain English</strong>.</div>
-  <p>We answer two core capabilities: <strong>(1) detect materials lacking a multi-sourcing
-  strategy</strong>, and <strong>(2) detect materials exposed to suppliers with a delivery-risk
-  flag</strong> — plus nine more related questions, all from a consolidated gold layer.</p>
+  <!-- ============================================================ -->
+  <h2 id="hook">1 · The hook — a $2M question <span class="clock">1 min</span></h2>
+  <div class="say">"Imagine one part on your assembly line comes from a single supplier — and that
+  supplier just got flagged for delivery risk. If they slip, the line stops. Today, finding those
+  parts means waiting on an SAP specialist. Let me show you how a purchasing analyst answers that in
+  seconds, in plain English, on Databricks."</div>
+  <div class="tip">Keep this framing throughout: we're not showing a database, we're removing the
+  dependency on SAP experts for everyday sourcing-risk questions.</div>
 
-  <h2 id="data">2 · The data model — 13 raw → 5 gold</h2>
-  <p>Everything is <strong>simulated</strong> from a deterministic seed, so the demo is fully
-  reproducible on a blank workspace. Thirteen SAP-style raw tables are consolidated by five
-  dependency-ordered workflows into five analysis-ready gold tables.</p>
+  <!-- ============================================================ -->
+  <h2 id="catalog">2 · Catalog Explorer — the governed data model <span class="clock">4 min</span></h2>
+  <p>Start in the Databricks UI left nav → <strong>Catalog</strong>.</p>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> Catalog → <code class="inline">serverless_stable_7qzrfp_catalog</code>
+      → <code class="inline">purchasing_demo</code>. Show the list of tables.
+      <div class="say">"We simulated a realistic SAP purchasing landscape — 13 raw SAP tables — and
+      consolidated them into 5 clean, analysis-ready 'gold' tables."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>SOURCING</strong> table → <strong>Overview</strong> tab.
+      <div class="show">The <strong>table description</strong> and the <strong>column comments</strong> — every
+      column is documented in business language (e.g. "IS_VALID_SOURCE = a valid, non-blocked source").</div>
+      <div class="say">"This is the heart of the model — which vendors are approved to supply which
+      material at which plant, plus their quota split."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>Sample data</strong> tab, then the
+      <strong>Details / Relationships</strong> view.
+      <div class="show">The <strong>primary key</strong> and the <strong>foreign key</strong> to MATERIAL.
+      These constraints aren't just documentation — Genie uses them to join correctly.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> into <strong>Functions</strong> in the schema. Open e.g.
+      <code class="inline">materials_without_multisourcing</code>.
+      <div class="show">These are <strong>governed, parameterized SQL functions</strong> — "trusted assets."
+      A business rule like "fewer than 2 valid vendors" is defined <em>once</em>, centrally, and reused
+      everywhere — including by Genie as a certified answer.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> a <strong>metric view</strong> such as
+      <code class="inline">mv_delivery_performance</code> and open its definition.
+      <div class="say">"KPIs like on-time-delivery rate are defined once as a metric view, so every
+      dashboard, Genie space, and app computes them identically. No metric drift."</div>
+    </li>
+  </ol>
+  <div class="tip">Don't dwell on SQL here. The message is <strong>governance</strong>: documented tables,
+  keys, certified functions, and consistent metrics — the foundation that makes the AI layer trustworthy.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="genie1">3 · Genie: Sourcing &amp; Supplier Risk <span class="clock">5 min</span></h2>
+  <p>Left nav → <strong>Genie</strong> → open <strong>"SAP Purchasing — Sourcing &amp; Supplier Risk."</strong></p>
+  <ol class="clicks">
+    <li><span class="click-label">SHOW</span> the space landing page.
+      <div class="show">The <strong>sample questions</strong> down the side and the attached tables. Mention
+      the space was configured with <strong>instructions</strong> (domain rules, join hints, example
+      queries, and certified functions) — that's why answers are accurate.</div>
+    </li>
+    <li><span class="click-label">TYPE</span> <span class="ask">Which materials have no multi-sourcing
+      strategy?</span>
+      <div class="show">When the answer returns, expand <strong>"Show generated code."</strong> Genie called
+      our <strong>certified function</strong> <code class="inline">materials_without_multisourcing(min_vendors =&gt; 2)</code>
+      — not hand-written SQL.</div>
+      <div class="say">"Notice it didn't guess. It used the trusted, governed definition of multi-sourcing
+      we saw in the catalog. That's the difference between a demo and something you'd trust in production."</div>
+    </li>
+    <li><span class="click-label">TYPE</span> the flagship question:
+      <span class="ask">Which materials are single-sourced and their sole supplier has a delivery-risk flag?</span>
+      <div class="show">The result — the highest-priority supply-continuity risks, with a risk score per material.</div>
+      <div class="say">"This is the $2M question from the start. Seconds, in plain English."</div>
+    </li>
+    <li><span class="click-label">TYPE</span> a follow-up to show conversational memory:
+      <span class="ask">Of those, which are at plant 1030?</span>
+      <div class="show">Genie keeps context and refines the previous answer.</div>
+    </li>
+    <li><span class="click-label">TYPE</span> a governance question:
+      <span class="ask">Which suppliers hold a purchasing block but still have active sourcing records?</span>
+      <div class="say">"A classic control gap — a blocked vendor that's still sourceable. The analyst finds
+      it without opening a ticket."</div>
+    </li>
+  </ol>
+  <div class="tip">If someone asks "how does it know what 'valid vendor' means?" — that's the
+  <strong>instructions</strong>. Open the space's <strong>Instructions</strong> panel and show the text rules
+  and the certified functions attached.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="genie2">4 · Genie: Purchase Order Analytics <span class="clock">3 min</span></h2>
+  <p>Open the second space — <strong>"SAP Purchasing — Purchase Order Analytics."</strong></p>
+  <ol class="clicks">
+    <li><span class="click-label">TYPE</span> <span class="ask">What is the on-time delivery rate per
+      supplier over the last 12 months?</span>
+      <div class="show">Again, "Show generated code" reveals it called <code class="inline">otd_rate_per_supplier(12)</code>.</div>
+    </li>
+    <li><span class="click-label">TYPE</span> <span class="ask">Which materials had purchase orders placed
+      with a supplier despite an active delivery-risk flag at order date?</span>
+      <div class="say">"This needs time-aware logic — was the risk active on the day we ordered? That rule
+      is baked into the model, so the analyst doesn't have to reason about it."</div>
+    </li>
+    <li><span class="click-label">TYPE</span> <span class="ask">What is the net-price variance across
+      vendors for the same material?</span> — a quick sourcing-savings angle.
+    </li>
+  </ol>
+  <div class="say">"Two focused spaces, each an expert in its domain. But I don't want a business user to
+  pick the right space — so we put a supervisor in front."</div>
+
+  <!-- ============================================================ -->
+  <h2 id="mas">5 · Agent Bricks — the Multi-Agent Supervisor <span class="clock">3 min</span></h2>
+  <p>Left nav → <strong>Agents</strong> (Agent Bricks) → open <strong>"sap_purchasing_supervisor."</strong></p>
+  <ol class="clicks">
+    <li><span class="click-label">SHOW</span> the supervisor's config.
+      <div class="show">The <strong>two agents</strong> it orchestrates (Sourcing &amp; Supplier Risk, Purchase
+      Order Analytics) and the <strong>routing instructions</strong>.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the built-in <strong>playground / test</strong> panel. Ask a
+      cross-domain question: <span class="ask">Do we have single-sourced risky materials that we also
+      placed purchase orders for recently?</span>
+      <div class="show">The <strong>trace</strong>: the supervisor routes to the right agent(s), each runs its
+      Genie space, and the answer is combined — one endpoint, both domains.</div>
+      <div class="say">"The business user just asks. The supervisor decides who answers. This is the single
+      brain the app will talk to."</div>
+    </li>
+    <li><span class="click-label">SHOW</span> (optional) the <strong>serving endpoint</strong> under
+      Serving — it's deployed and queryable like any model endpoint.</div>
+    </li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2 id="app">6 · The App — one screen for the business <span class="clock">4 min</span></h2>
+  <p>Left nav → <strong>Apps</strong> → open <strong>"sap-purchasing-app."</strong></p>
+  <ol class="clicks">
+    <li><span class="click-label">SHOW</span> the <strong>Visualizations</strong> tab.
+      <div class="show">The <strong>KPI cards</strong> up top — materials without multi-sourcing,
+      single-sourced &amp; risky, suppliers at delivery risk, overall on-time rate — quantify the risk at a
+      glance. Then the four charts (sourcing coverage, risk by category, worst OTD suppliers, price spread).</div>
+      <div class="say">"Every number here comes from the same governed metric views and functions we saw in
+      the catalog — the app isn't its own source of truth, it's a window onto the governed layer."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>Chat (MAS)</strong> tab. Click a sample question
+      chip, or type <span class="ask">Which suppliers have the worst on-time delivery?</span>
+      <div class="show">The answer streams back with a <strong>"routed to …"</strong> badge showing which agent
+      the supervisor picked.</div>
+      <div class="say">"Same intelligence as Genie, embedded where the business already works — behind our
+      own branding, our own screen."</div>
+    </li>
+    <li><span class="click-label">SAY</span> the punchline.
+      <div class="say">"Charts for the overview, chat for the follow-up — and both are powered by the exact
+      same governed data, functions, and agents. Nothing is bolted on."</div>
+    </li>
+  </ol>
+
+  <!-- ============================================================ -->
+  <h2 id="close">7 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
+  <div class="say">"To make natural language trustworthy, we grounded it: documented tables with keys,
+  KPIs defined once as metric views, business rules as certified functions, and a benchmark that scores
+  the agent's answers against known-good SQL — it scored <strong>100%</strong> on our question set."</div>
+  <div class="show">The whole thing is a set of <strong>manually-runnable notebooks</strong>, parameterized
+  once, reproducible on a blank workspace — no black boxes.</div>
+  <div class="tip">If asked "can we point this at our real SAP data?" — yes: swap the simulated raw tables
+  for your ingested SAP tables; the gold workflows, functions, metric views, Genie spaces, supervisor and
+  app all sit on top unchanged.</div>
+
+  <h3>The 11 questions this demo answers (quick reference)</h3>
   <table>
-    <tr><th>Gold table</th><th>Grain</th><th>Built from</th></tr>
-    <tr><td>MATERIAL</td><td>MATNR + WERKS</td><td>MARC ⨝ MARA ⨝ MAKT (EN only)</td></tr>
-    <tr><td>SUPPLIER</td><td>LIFNR + EKORG</td><td>LFM1 ⨝ LFA1 (LFB1 dropped)</td></tr>
-    <tr><td>SOURCING</td><td>MATNR + WERKS + LIFNR</td><td>EORD ⨝ flattened EQUK/EQUP</td></tr>
-    <tr><td>SUPPLIER_RISK</td><td>LIFNR (time-sliced)</td><td>RAW_SUPPLIER_RISK, RI-validated</td></tr>
-    <tr><td>PURCHASE_ORDER</td><td>EBELN + EBELP</td><td>EKPO ⨝ EKKO ⨝ earliest GR (EKBE)</td></tr>
-  </table>
-  <div class="step"><span class="n">▶</span><strong>Show in Catalog Explorer.</strong> Open the
-  <code class="inline">purchasing_demo</code> schema. Point out: <strong>primary keys</strong> on every
-  gold table, the <strong>foreign key</strong> SOURCING → MATERIAL, and rich <strong>table &amp; column
-  comments</strong> — these power Genie and the ER diagram.</div>
-  <div class="tip">Deliberate, meaningful gaps are baked in: some materials are single-sourced,
-  some suppliers carry an active delivery-risk flag, some quotas exceed 80% to one vendor, some
-  quotas are <code class="inline">NULL</code> (source-listed but not quota-split), and some POs were placed
-  while risk was active. Every business question returns a real answer.</div>
-
-  <h2 id="semantics">3 · Governed semantics</h2>
-  <h3>Parameterized trusted SQL functions</h3>
-  <p>The nuanced logic is encapsulated as governed, parameterized UC functions — a
-  <span class="badge">certified answer</span> Genie can call instead of guessing SQL.</p>
-  <pre>-- "materials with no multi-sourcing strategy" is a one-liner:
-SELECT * FROM purchasing_demo.materials_without_multisourcing(2);
-
--- one vendor holding &gt; 80% of quota:
-SELECT * FROM purchasing_demo.quota_concentration(80);
-
--- on-time delivery rate per supplier, last 12 months:
-SELECT * FROM purchasing_demo.otd_rate_per_supplier(12);</pre>
-  <h3>UC Metric Views</h3>
-  <p>Four governed metric views define the KPIs once (sourcing coverage, supplier risk, delivery
-  performance, price analytics) — reused identically by Genie, the App and any dashboard.</p>
-  <pre>SELECT `Supplier`, MEASURE(`OTD Rate`), MEASURE(`Deliveries`)
-FROM purchasing_demo.mv_delivery_performance
-GROUP BY ALL ORDER BY 2 ASC;</pre>
-  <h3>Value dictionary</h3>
-  <p><code class="inline">VALUE_DICTIONARY</code> maps cryptic SAP codes to plain language so an analyst can say
-  "raw materials" and Genie knows that means <code class="inline">MTART='ROH'</code>.</p>
-
-  <h2 id="genie">4 · Genie spaces — natural-language sourcing risk</h2>
-  <p>Two domain-split spaces, each configured with <strong>all instruction types</strong>
-  (general/text notes first, then joins, then SQL examples, then certified functions):</p>
-  <table>
-    <tr><th>Space</th><th>Covers</th></tr>
-    <tr><td><strong>Sourcing &amp; Supplier Risk</strong></td><td>Multi-sourcing, single-sourcing, supplier risk, purchasing blocks, quota</td></tr>
-    <tr><td><strong>Purchase Order Analytics</strong></td><td>On-time delivery, price variance, spend, orders under active risk</td></tr>
-  </table>
-  <div class="step"><span class="n">1</span>Open <strong>Space 1</strong>. Ask:
-  <span class="q">"Which materials have no multi-sourcing strategy?"</span></div>
-  <div class="say">Notice Genie doesn't hand-write SQL — it calls our <strong>certified function</strong>
-  <code class="inline">materials_without_multisourcing(min_vendors =&gt; 2)</code>. That's a trusted, governed answer.</div>
-  <div class="step"><span class="n">2</span>Ask the flagship risk question:
-  <span class="q">"Which materials are single-sourced and their sole supplier has a delivery-risk flag?"</span>
-  → returns the highest-priority supply-continuity risks with risk scores.</div>
-  <div class="step"><span class="n">3</span>Switch to <strong>Space 2</strong>. Ask:
-  <span class="q">"What is the on-time delivery rate per supplier over the last 12 months?"</span></div>
-  <div class="tip">Instruction ordering recommendation (in the <code class="inline">genie_instructions_*.md</code> files):
-  add <strong>general/text instructions first</strong> (highest ROI — vocabulary + the "valid vendor" and
-  time-slice rules), then joins, then SQL examples, then certified functions.</div>
-
-  <h2 id="mas">5 · Agent Bricks Multi-Agent Supervisor</h2>
-  <p>The two Genie spaces sit behind a single <strong>Multi-Agent Supervisor</strong> serving endpoint.
-  It routes each question to the right domain — or consults both for cross-domain questions.</p>
-  <div class="step"><span class="n">▶</span>Query the endpoint (Responses API):</div>
-  <pre>POST /serving-endpoints/mas-655dcd32-endpoint/invocations
-{ "input": [{ "role": "user",
-    "content": "Did we place POs with single-sourced risky suppliers?" }] }</pre>
-  <div class="say">Watch the trace: the supervisor emits a <code class="inline">function_call</code> to
-  <strong>Sourcing_Supplier_Risk</strong> (and/or <strong>Purchase_Order_Analytics</strong>), each of which
-  runs its Genie space, then the supervisor combines the answer.</div>
-
-  <h2 id="app">6 · The App — visualizations + chat</h2>
-  <p>A Databricks App (React + FastAPI) with two tabs:</p>
-  <ul>
-    <li><strong>Visualizations</strong> — KPI cards (materials without multi-sourcing, single-sourced &amp;
-    risky, suppliers at risk, overall OTD) and four charts, all fed by the metric views and trusted
-    functions via the serverless SQL warehouse.</li>
-    <li><strong>Chat (MAS)</strong> — the same natural-language experience as Genie, but through the
-    supervisor endpoint, with the routed agent shown for each answer.</li>
-  </ul>
-  <div class="step"><span class="n">1</span>Open the <strong>Visualizations</strong> tab — the KPI cards
-  immediately quantify the sourcing risk (e.g. materials without multi-sourcing, single-sourced &amp; risky).</div>
-  <div class="step"><span class="n">2</span>Open the <strong>Chat</strong> tab, click a sample question, and
-  show the answer streaming back with the "routed to …" badge.</div>
-
-  <h2 id="benchmark">7 · Trust &amp; accuracy — the benchmark</h2>
-  <p>We ship a benchmark of representative questions (the 11 spec questions + extras), each with
-  <strong>known-good SQL</strong>. The runner executes the known-good SQL <em>and</em> asks the MAS the
-  natural-language question, then compares result signatures and prints an <strong>accuracy score</strong>.</p>
-  <div class="say">On the reference dataset the MAS scores ~<strong>94–100%</strong> against the known-good
-  answers — proving the natural-language layer is trustworthy, not a black box.</div>
-  <pre>SELECT id, known_good, mas, match FROM purchasing_demo._BENCHMARK_RESULTS ORDER BY id;</pre>
-
-  <h2 id="questions">8 · The 11 business questions (reference)</h2>
-  <table>
-    <tr><th>#</th><th>Question</th><th>Trusted function</th></tr>
-    <tr><td>1</td><td>Materials with no multi-sourcing strategy (&lt; 2 valid vendors)</td><td>materials_without_multisourcing(2)</td></tr>
-    <tr><td>2</td><td>Materials linked to a delivery-risk supplier</td><td>materials_linked_to_risky_supplier_today()</td></tr>
-    <tr><td>3</td><td>Single-sourced &amp; sole supplier is risky</td><td>single_sourced_risky_today()</td></tr>
-    <tr><td>4</td><td>Vendor count per material at each plant</td><td>vendor_count_per_material()</td></tr>
-    <tr><td>5</td><td>Blocked suppliers with active sourcing</td><td>blocked_suppliers_with_active_sourcing()</td></tr>
-    <tr><td>6</td><td>Quota &gt; 80% to one vendor</td><td>quota_concentration(80)</td></tr>
-    <tr><td>7</td><td>On-time delivery rate per supplier (12 mo)</td><td>otd_rate_per_supplier(12)</td></tr>
-    <tr><td>8</td><td>POs placed under active delivery risk</td><td>pos_under_active_risk()</td></tr>
-    <tr><td>9</td><td>Suppliers across &gt; 1 material group</td><td>suppliers_multi_material_group()</td></tr>
-    <tr><td>10</td><td>Materials with no valid sourcing at all</td><td>materials_without_valid_sourcing()</td></tr>
-    <tr><td>11</td><td>Net-price variance across vendors per material</td><td>net_price_variance_per_material()</td></tr>
+    <tr><th>#</th><th>Question</th></tr>
+    <tr><td>1</td><td>Materials with no multi-sourcing strategy (&lt; 2 valid vendors)</td></tr>
+    <tr><td>2</td><td>Materials linked to a delivery-risk supplier</td></tr>
+    <tr><td>3</td><td>Single-sourced &amp; sole supplier is risky</td></tr>
+    <tr><td>4</td><td>Vendor count per material at each plant</td></tr>
+    <tr><td>5</td><td>Blocked suppliers with active sourcing</td></tr>
+    <tr><td>6</td><td>Quota &gt; 80% to one vendor</td></tr>
+    <tr><td>7</td><td>On-time delivery rate per supplier (12 months)</td></tr>
+    <tr><td>8</td><td>POs placed under an active delivery-risk flag</td></tr>
+    <tr><td>9</td><td>Suppliers spanning &gt; 1 material group</td></tr>
+    <tr><td>10</td><td>Materials with no valid sourcing at all</td></tr>
+    <tr><td>11</td><td>Net-price variance across vendors per material</td></tr>
   </table>
 
-  <div class="tip"><strong>Setup recap.</strong> Build order: <code class="inline">00_run_all</code> (data + semantics) →
-  <code class="inline">04a_resources</code> → <code class="inline">05a_create_genie_spaces</code> →
-  <code class="inline">06a_create_mas</code> → <code class="inline">07a_benchmark</code> → deploy the App. Everything is
-  parameterized once in <code class="inline">00_run_all</code>; the catalog is taken as-is and the schema is created.</div>
+  <h3>Pre-demo setup checklist</h3>
+  <div class="setup">
+    Ensure these have been run (once): <code class="inline">00_run_all</code> (data + semantics) →
+    <code class="inline">04a_resources</code> → <code class="inline">05a_create_genie_spaces</code> →
+    <code class="inline">06a_create_mas</code> → <code class="inline">07a_benchmark</code> → deploy the app
+    (<code class="inline">app/deploy_app</code>). Open both Genie spaces, the supervisor, and the app in
+    separate browser tabs before you start so switching is instant. Warm the SQL warehouse with one query
+    so the first Genie answer isn't waiting on a cold start.
+  </div>
 
 </div>
 </body>
