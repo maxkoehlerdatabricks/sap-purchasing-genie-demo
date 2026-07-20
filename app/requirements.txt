@@ -1,0 +1,8 @@
+# Databricks App backend dependencies.
+# NOTE (per demo standard): never pin pyspark; the App uses the SQL connector + SDK,
+# not Spark. Serverless-compatible.
+fastapi
+uvicorn[standard]
+databricks-sdk
+databricks-sql-connector
+requests

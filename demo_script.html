@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Demo Script — SAP Purchasing: Sourcing Risk &amp; PO Analytics on Databricks</title>
+<style>
+  :root { --red:#FF3621; --navy:#1B3139; --green:#00A972; --amber:#FFAB00; --blue:#2272B4; --bg:#f6f7f9; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; color:var(--navy); background:var(--bg); line-height:1.55; }
+  .wrap { max-width:960px; margin:0 auto; padding:0 24px 80px; }
+  header.hero { background:linear-gradient(135deg,#1B3139,#2272B4); color:#fff; padding:48px 24px; }
+  header.hero .wrap { padding-bottom:24px; }
+  header.hero h1 { margin:0 0 8px; font-size:30px; }
+  header.hero p { margin:4px 0; opacity:.9; }
+  .pill { display:inline-block; background:rgba(255,255,255,.15); border-radius:14px; padding:3px 10px; font-size:12px; margin:6px 6px 0 0; }
+  h2 { color:var(--red); border-bottom:2px solid #eaecef; padding-bottom:6px; margin-top:40px; }
+  h3 { margin-top:26px; }
+  code, pre { font-family:ui-monospace,Menlo,Consolas,monospace; }
+  pre { background:#0f1720; color:#e6edf3; padding:14px 16px; border-radius:8px; overflow-x:auto; font-size:13px; }
+  code.inline { background:#eef2f4; padding:1px 6px; border-radius:4px; font-size:.9em; }
+  table { border-collapse:collapse; width:100%; margin:14px 0; background:#fff; border-radius:8px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid #eef1f3; font-size:14px; }
+  th { background:#f0f3f5; }
+  .step { background:#fff; border-left:4px solid var(--red); border-radius:8px; padding:16px 20px; margin:16px 0; box-shadow:0 1px 3px rgba(0,0,0,.07); }
+  .step .n { display:inline-block; background:var(--red); color:#fff; border-radius:50%; width:26px; height:26px; text-align:center; line-height:26px; font-weight:700; margin-right:8px; }
+  .say { border-left:4px solid var(--green); background:#f0fbf6; padding:10px 14px; border-radius:6px; margin:10px 0; }
+  .say::before { content:"🗣  Say: "; font-weight:700; color:var(--green); }
+  .tip { border-left:4px solid var(--amber); background:#fff9ea; padding:10px 14px; border-radius:6px; margin:10px 0; font-size:14px; }
+  .toc a { color:var(--blue); text-decoration:none; }
+  .toc li { margin:4px 0; }
+  .q { font-weight:600; color:var(--navy); }
+  .badge { background:var(--green); color:#fff; border-radius:6px; padding:2px 8px; font-size:12px; }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <h1>SAP Purchasing — Sourcing Risk &amp; PO Analytics</h1>
+    <p>End-to-end Databricks demo: 13 simulated SAP tables → 5 governed gold tables → 2 Genie spaces → Agent Bricks Multi-Agent Supervisor → App.</p>
+    <p>Persona: <strong>purchasing business analyst</strong> answering sourcing-risk &amp; supply-continuity questions — without SAP access.</p>
+    <div>
+      <span class="pill">Unity Catalog</span>
+      <span class="pill">Metric Views</span>
+      <span class="pill">Trusted SQL Functions</span>
+      <span class="pill">Genie ×2</span>
+      <span class="pill">Agent Bricks MAS</span>
+      <span class="pill">Databricks App</span>
+      <span class="pill">Serverless</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <h2 id="toc">Contents</h2>
+  <ol class="toc">
+    <li><a href="#story">The business story (2 min)</a></li>
+    <li><a href="#data">The data model — 13 raw → 5 gold (3 min)</a></li>
+    <li><a href="#semantics">Governed semantics: functions, metric views, value dictionary (3 min)</a></li>
+    <li><a href="#genie">Genie spaces — natural-language sourcing risk (5 min)</a></li>
+    <li><a href="#mas">Agent Bricks Multi-Agent Supervisor (3 min)</a></li>
+    <li><a href="#app">The App — visualizations + chat (4 min)</a></li>
+    <li><a href="#benchmark">Trust &amp; accuracy — the benchmark (2 min)</a></li>
+    <li><a href="#questions">The 11 business questions (reference)</a></li>
+  </ol>
+
+  <h2 id="story">1 · The business story</h2>
+  <div class="say">An automotive OEM buys thousands of parts from hundreds of suppliers. If a
+  critical part is <em>single-sourced</em> and that one supplier has a delivery-risk flag, the
+  line can stop. Today that analysis lives in SAP and needs specialist access. We've lifted
+  the purchasing data into Databricks so <strong>any analyst can ask these questions in plain English</strong>.</div>
+  <p>We answer two core capabilities: <strong>(1) detect materials lacking a multi-sourcing
+  strategy</strong>, and <strong>(2) detect materials exposed to suppliers with a delivery-risk
+  flag</strong> — plus nine more related questions, all from a consolidated gold layer.</p>
+
+  <h2 id="data">2 · The data model — 13 raw → 5 gold</h2>
+  <p>Everything is <strong>simulated</strong> from a deterministic seed, so the demo is fully
+  reproducible on a blank workspace. Thirteen SAP-style raw tables are consolidated by five
+  dependency-ordered workflows into five analysis-ready gold tables.</p>
+  <table>
+    <tr><th>Gold table</th><th>Grain</th><th>Built from</th></tr>
+    <tr><td>MATERIAL</td><td>MATNR + WERKS</td><td>MARC ⨝ MARA ⨝ MAKT (EN only)</td></tr>
+    <tr><td>SUPPLIER</td><td>LIFNR + EKORG</td><td>LFM1 ⨝ LFA1 (LFB1 dropped)</td></tr>
+    <tr><td>SOURCING</td><td>MATNR + WERKS + LIFNR</td><td>EORD ⨝ flattened EQUK/EQUP</td></tr>
+    <tr><td>SUPPLIER_RISK</td><td>LIFNR (time-sliced)</td><td>RAW_SUPPLIER_RISK, RI-validated</td></tr>
+    <tr><td>PURCHASE_ORDER</td><td>EBELN + EBELP</td><td>EKPO ⨝ EKKO ⨝ earliest GR (EKBE)</td></tr>
+  </table>
+  <div class="step"><span class="n">▶</span><strong>Show in Catalog Explorer.</strong> Open the
+  <code class="inline">purchasing_demo</code> schema. Point out: <strong>primary keys</strong> on every
+  gold table, the <strong>foreign key</strong> SOURCING → MATERIAL, and rich <strong>table &amp; column
+  comments</strong> — these power Genie and the ER diagram.</div>
+  <div class="tip">Deliberate, meaningful gaps are baked in: some materials are single-sourced,
+  some suppliers carry an active delivery-risk flag, some quotas exceed 80% to one vendor, some
+  quotas are <code class="inline">NULL</code> (source-listed but not quota-split), and some POs were placed
+  while risk was active. Every business question returns a real answer.</div>
+
+  <h2 id="semantics">3 · Governed semantics</h2>
+  <h3>Parameterized trusted SQL functions</h3>
+  <p>The nuanced logic is encapsulated as governed, parameterized UC functions — a
+  <span class="badge">certified answer</span> Genie can call instead of guessing SQL.</p>
+  <pre>-- "materials with no multi-sourcing strategy" is a one-liner:
+SELECT * FROM purchasing_demo.materials_without_multisourcing(2);
+
+-- one vendor holding &gt; 80% of quota:
+SELECT * FROM purchasing_demo.quota_concentration(80);
+
+-- on-time delivery rate per supplier, last 12 months:
+SELECT * FROM purchasing_demo.otd_rate_per_supplier(12);</pre>
+  <h3>UC Metric Views</h3>
+  <p>Four governed metric views define the KPIs once (sourcing coverage, supplier risk, delivery
+  performance, price analytics) — reused identically by Genie, the App and any dashboard.</p>
+  <pre>SELECT `Supplier`, MEASURE(`OTD Rate`), MEASURE(`Deliveries`)
+FROM purchasing_demo.mv_delivery_performance
+GROUP BY ALL ORDER BY 2 ASC;</pre>
+  <h3>Value dictionary</h3>
+  <p><code class="inline">VALUE_DICTIONARY</code> maps cryptic SAP codes to plain language so an analyst can say
+  "raw materials" and Genie knows that means <code class="inline">MTART='ROH'</code>.</p>
+
+  <h2 id="genie">4 · Genie spaces — natural-language sourcing risk</h2>
+  <p>Two domain-split spaces, each configured with <strong>all instruction types</strong>
+  (general/text notes first, then joins, then SQL examples, then certified functions):</p>
+  <table>
+    <tr><th>Space</th><th>Covers</th></tr>
+    <tr><td><strong>Sourcing &amp; Supplier Risk</strong></td><td>Multi-sourcing, single-sourcing, supplier risk, purchasing blocks, quota</td></tr>
+    <tr><td><strong>Purchase Order Analytics</strong></td><td>On-time delivery, price variance, spend, orders under active risk</td></tr>
+  </table>
+  <div class="step"><span class="n">1</span>Open <strong>Space 1</strong>. Ask:
+  <span class="q">"Which materials have no multi-sourcing strategy?"</span></div>
+  <div class="say">Notice Genie doesn't hand-write SQL — it calls our <strong>certified function</strong>
+  <code class="inline">materials_without_multisourcing(min_vendors =&gt; 2)</code>. That's a trusted, governed answer.</div>
+  <div class="step"><span class="n">2</span>Ask the flagship risk question:
+  <span class="q">"Which materials are single-sourced and their sole supplier has a delivery-risk flag?"</span>
+  → returns the highest-priority supply-continuity risks with risk scores.</div>
+  <div class="step"><span class="n">3</span>Switch to <strong>Space 2</strong>. Ask:
+  <span class="q">"What is the on-time delivery rate per supplier over the last 12 months?"</span></div>
+  <div class="tip">Instruction ordering recommendation (in the <code class="inline">genie_instructions_*.md</code> files):
+  add <strong>general/text instructions first</strong> (highest ROI — vocabulary + the "valid vendor" and
+  time-slice rules), then joins, then SQL examples, then certified functions.</div>
+
+  <h2 id="mas">5 · Agent Bricks Multi-Agent Supervisor</h2>
+  <p>The two Genie spaces sit behind a single <strong>Multi-Agent Supervisor</strong> serving endpoint.
+  It routes each question to the right domain — or consults both for cross-domain questions.</p>
+  <div class="step"><span class="n">▶</span>Query the endpoint (Responses API):</div>
+  <pre>POST /serving-endpoints/mas-655dcd32-endpoint/invocations
+{ "input": [{ "role": "user",
+    "content": "Did we place POs with single-sourced risky suppliers?" }] }</pre>
+  <div class="say">Watch the trace: the supervisor emits a <code class="inline">function_call</code> to
+  <strong>Sourcing_Supplier_Risk</strong> (and/or <strong>Purchase_Order_Analytics</strong>), each of which
+  runs its Genie space, then the supervisor combines the answer.</div>
+
+  <h2 id="app">6 · The App — visualizations + chat</h2>
+  <p>A Databricks App (React + FastAPI) with two tabs:</p>
+  <ul>
+    <li><strong>Visualizations</strong> — KPI cards (materials without multi-sourcing, single-sourced &amp;
+    risky, suppliers at risk, overall OTD) and four charts, all fed by the metric views and trusted
+    functions via the serverless SQL warehouse.</li>
+    <li><strong>Chat (MAS)</strong> — the same natural-language experience as Genie, but through the
+    supervisor endpoint, with the routed agent shown for each answer.</li>
+  </ul>
+  <div class="step"><span class="n">1</span>Open the <strong>Visualizations</strong> tab — the KPI cards
+  immediately quantify the sourcing risk (e.g. materials without multi-sourcing, single-sourced &amp; risky).</div>
+  <div class="step"><span class="n">2</span>Open the <strong>Chat</strong> tab, click a sample question, and
+  show the answer streaming back with the "routed to …" badge.</div>
+
+  <h2 id="benchmark">7 · Trust &amp; accuracy — the benchmark</h2>
+  <p>We ship a benchmark of representative questions (the 11 spec questions + extras), each with
+  <strong>known-good SQL</strong>. The runner executes the known-good SQL <em>and</em> asks the MAS the
+  natural-language question, then compares result signatures and prints an <strong>accuracy score</strong>.</p>
+  <div class="say">On the reference dataset the MAS scores ~<strong>94–100%</strong> against the known-good
+  answers — proving the natural-language layer is trustworthy, not a black box.</div>
+  <pre>SELECT id, known_good, mas, match FROM purchasing_demo._BENCHMARK_RESULTS ORDER BY id;</pre>
+
+  <h2 id="questions">8 · The 11 business questions (reference)</h2>
+  <table>
+    <tr><th>#</th><th>Question</th><th>Trusted function</th></tr>
+    <tr><td>1</td><td>Materials with no multi-sourcing strategy (&lt; 2 valid vendors)</td><td>materials_without_multisourcing(2)</td></tr>
+    <tr><td>2</td><td>Materials linked to a delivery-risk supplier</td><td>materials_linked_to_risky_supplier_today()</td></tr>
+    <tr><td>3</td><td>Single-sourced &amp; sole supplier is risky</td><td>single_sourced_risky_today()</td></tr>
+    <tr><td>4</td><td>Vendor count per material at each plant</td><td>vendor_count_per_material()</td></tr>
+    <tr><td>5</td><td>Blocked suppliers with active sourcing</td><td>blocked_suppliers_with_active_sourcing()</td></tr>
+    <tr><td>6</td><td>Quota &gt; 80% to one vendor</td><td>quota_concentration(80)</td></tr>
+    <tr><td>7</td><td>On-time delivery rate per supplier (12 mo)</td><td>otd_rate_per_supplier(12)</td></tr>
+    <tr><td>8</td><td>POs placed under active delivery risk</td><td>pos_under_active_risk()</td></tr>
+    <tr><td>9</td><td>Suppliers across &gt; 1 material group</td><td>suppliers_multi_material_group()</td></tr>
+    <tr><td>10</td><td>Materials with no valid sourcing at all</td><td>materials_without_valid_sourcing()</td></tr>
+    <tr><td>11</td><td>Net-price variance across vendors per material</td><td>net_price_variance_per_material()</td></tr>
+  </table>
+
+  <div class="tip"><strong>Setup recap.</strong> Build order: <code class="inline">00_run_all</code> (data + semantics) →
+  <code class="inline">04a_resources</code> → <code class="inline">05a_create_genie_spaces</code> →
+  <code class="inline">06a_create_mas</code> → <code class="inline">07a_benchmark</code> → deploy the App. Everything is
+  parameterized once in <code class="inline">00_run_all</code>; the catalog is taken as-is and the schema is created.</div>
+
+</div>
+</body>
+</html>

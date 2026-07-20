@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SAP Purchasing — Sourcing Risk & PO Analytics</title>
+  <!--
+    No-build, self-contained frontend for the Databricks App.
+    Uses Chart.js from a CDN (loaded by the browser, which has internet access).
+    The equivalent React + Vite source lives in ../src — run `npm run build` to
+    regenerate this dist from that source if you prefer the React version.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    :root { --db-red:#FF3621; --db-navy:#1B3139; --db-green:#00A972; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#f6f7f9; color:#1B3139; }
+    .app { max-width:1200px; margin:0 auto; padding:0 16px 48px; }
+    header { padding:20px 0 8px; }
+    header h1 { font-size:22px; margin:0 0 12px; }
+    nav button { background:none; border:none; border-bottom:3px solid transparent; padding:8px 14px; font-size:15px; cursor:pointer; color:#5a6b74; }
+    nav button.active { color:var(--db-red); border-bottom-color:var(--db-red); font-weight:600; }
+    main { margin-top:16px; }
+    .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin-bottom:20px; }
+    .kpi { background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); border-left:4px solid #ccc; }
+    .kpi.bad { border-left-color:var(--db-red); } .kpi.warn { border-left-color:#FFAB00; } .kpi.ok { border-left-color:var(--db-green); }
+    .kpi-value { font-size:28px; font-weight:700; } .kpi-label { font-size:12px; color:#5a6b74; margin-top:4px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(440px,1fr)); gap:16px; }
+    .card { background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .card h3 { margin:0 0 2px; font-size:15px; } .card .sub { margin:0 0 10px; font-size:12px; color:#8a9aa2; }
+    .chat { background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .samples { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .samples button { background:#eef2f4; border:1px solid #dbe3e7; border-radius:16px; padding:6px 12px; font-size:12px; cursor:pointer; }
+    .messages { min-height:280px; max-height:460px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:8px 0; }
+    .msg { padding:10px 12px; border-radius:8px; max-width:85%; }
+    .msg.user { align-self:flex-end; background:var(--db-navy); color:#fff; }
+    .msg.assistant { align-self:flex-start; background:#f0f3f5; }
+    .msg .agent { font-size:11px; color:var(--db-green); margin-bottom:4px; font-weight:600; }
+    .msg pre { margin:0; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+    .composer { display:flex; gap:8px; margin-top:12px; }
+    .composer input { flex:1; padding:10px 12px; border:1px solid #dbe3e7; border-radius:8px; font-size:14px; }
+    .composer button { background:var(--db-red); color:#fff; border:none; border-radius:8px; padding:10px 20px; cursor:pointer; }
+    footer { margin-top:24px; text-align:center; font-size:11px; color:#a4b1b8; }
+    canvas { max-height:280px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>SAP Purchasing — Sourcing Risk &amp; PO Analytics</h1>
+      <nav>
+        <button id="tab-viz" class="active" onclick="showTab('viz')">Visualizations</button>
+        <button id="tab-chat" onclick="showTab('chat')">Chat (MAS)</button>
+      </nav>
+    </header>
+    <main>
+      <section id="viz">
+        <div class="kpis" id="kpis"></div>
+        <div class="grid">
+          <div class="card"><h3>Sourcing coverage by material group</h3><p class="sub">Distinct vendors (mv_sourcing_coverage)</p><canvas id="c_cov"></canvas></div>
+          <div class="card"><h3>Delivery-risk vendors by risk category</h3><p class="sub">mv_supplier_risk</p><canvas id="c_risk"></canvas></div>
+          <div class="card"><h3>Worst on-time delivery by supplier</h3><p class="sub">mv_delivery_performance (lower = worse)</p><canvas id="c_otd"></canvas></div>
+          <div class="card"><h3>Top net-price spread by material</h3><p class="sub">net_price_variance_per_material()</p><canvas id="c_price"></canvas></div>
+        </div>
+      </section>
+      <section id="chat" style="display:none">
+        <div class="chat">
+          <div class="samples" id="samples"></div>
+          <div class="messages" id="messages"></div>
+          <div class="composer">
+            <input id="input" placeholder="Ask about sourcing risk or PO analytics…" onkeydown="if(event.key==='Enter')send()" />
+            <button onclick="send()">Send</button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer>Powered by Databricks Genie · Agent Bricks Multi-Agent Supervisor · Unity Catalog metric views</footer>
+  </div>
+
+<script>
+const COLORS = ["#FF3621","#1B3139","#00A972","#FFAB00","#2272B4","#8BCAE7","#E67E22","#9B59B6"];
+const j = (p, o) => fetch(p, o).then(r => r.json());
+
+function showTab(t){
+  document.getElementById('viz').style.display = t==='viz'?'block':'none';
+  document.getElementById('chat').style.display = t==='chat'?'block':'none';
+  document.getElementById('tab-viz').className = t==='viz'?'active':'';
+  document.getElementById('tab-chat').className = t==='chat'?'active':'';
+}
+
+function bar(id, rows, labelKey, valKey){
+  const el = document.getElementById(id);
+  new Chart(el, {
+    type:'bar',
+    data:{ labels: rows.map(r=>String(r[labelKey])),
+           datasets:[{ data: rows.map(r=>Number(r[valKey])), backgroundColor: rows.map((_,i)=>COLORS[i%COLORS.length]) }] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{ticks:{maxRotation:60,minRotation:30,font:{size:10}}}} }
+  });
+}
+
+async function loadViz(){
+  try{
+    const k = await j('/api/charts/kpis');
+    const cards = [
+      {l:"Materials w/o multi-sourcing", v:k.no_multisource, t:"warn"},
+      {l:"Single-sourced & risky", v:k.single_sourced_risky, t:"bad"},
+      {l:"Suppliers at delivery risk", v:k.risky_suppliers, t:"bad"},
+      {l:"Materials w/o valid sourcing", v:k.no_sourcing, t:"warn"},
+      {l:"Overall OTD rate", v:(k.overall_otd!=null?(k.overall_otd*100).toFixed(1)+"%":"—"), t:"ok"},
+    ];
+    document.getElementById('kpis').innerHTML = cards.map(c=>
+      `<div class="kpi ${c.t}"><div class="kpi-value">${c.v}</div><div class="kpi-label">${c.l}</div></div>`).join('');
+  }catch(e){}
+  try{ bar('c_cov', await j('/api/charts/sourcing_coverage'), 'material_group', 'distinct_vendors'); }catch(e){}
+  try{ bar('c_risk', await j('/api/charts/risk_exposure'), 'risk_category', 'delivery_risk_vendors'); }catch(e){}
+  try{ bar('c_otd', await j('/api/charts/otd'), 'supplier', 'otd_rate'); }catch(e){}
+  try{ bar('c_price', await j('/api/charts/price_variance'), 'material', 'price_spread'); }catch(e){}
+}
+
+const SAMPLES = [
+  "Which materials have no multi-sourcing strategy?",
+  "Which materials are single-sourced and their sole supplier has a delivery-risk flag?",
+  "What is the on-time delivery rate per supplier over the last 12 months?",
+  "Which suppliers hold a purchasing block but still have active sourcing records?",
+];
+let busy=false;
+function renderMsg(role, text, agent){
+  const m=document.getElementById('messages');
+  const d=document.createElement('div'); d.className='msg '+role;
+  d.innerHTML=(agent?`<div class="agent">↳ routed to ${agent}</div>`:'')+`<pre></pre>`;
+  d.querySelector('pre').textContent=text; m.appendChild(d); m.scrollTop=m.scrollHeight;
+}
+async function send(text){
+  const inp=document.getElementById('input');
+  const q=(text||inp.value).trim(); if(!q||busy) return;
+  renderMsg('user', q); inp.value=''; busy=true;
+  renderMsg('assistant', 'Thinking… (routing via the Multi-Agent Supervisor)');
+  try{
+    const res=await j('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});
+    document.getElementById('messages').lastChild.remove();
+    renderMsg('assistant', res.answer||'(no answer)', res.agent);
+  }catch(e){ document.getElementById('messages').lastChild.remove(); renderMsg('assistant','Error: '+e); }
+  busy=false;
+}
+document.getElementById('samples').innerHTML='';
+SAMPLES.forEach(s=>{ const b=document.createElement('button'); b.textContent=s; b.onclick=()=>send(s); document.getElementById('samples').appendChild(b); });
+
+loadViz();
+</script>
+</body>
+</html>

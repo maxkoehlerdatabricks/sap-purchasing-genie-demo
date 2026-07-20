@@ -1,0 +1,16 @@
+# Node / frontend build artifacts
+app/frontend/node_modules/
+app/frontend/package-lock.json
+# The prebuilt static dist IS committed (no-build deploy) — do not ignore it.
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/

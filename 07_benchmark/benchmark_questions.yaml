@@ -1,0 +1,110 @@
+# ============================================================================
+# Benchmark question set for the SAP Purchasing demo.
+# Each item has:
+#   id            - short identifier
+#   question      - natural-language question (asked to Genie / MAS in the demo)
+#   known_good_sql- the trusted, reviewed SQL that defines the correct answer
+#   signature     - how to compare: "rowcount" (compare number of rows) or
+#                   "scalar" (compare the single scalar value in row 0 col 0)
+#   space         - which Genie space this belongs to (for reference)
+# The runner executes known_good_sql on the gold layer and (optionally) asks the
+# MAS the NL question, then compares result signatures to compute an accuracy score.
+# The 11 spec questions are Q1..Q11; QX_* are additional representative questions.
+# ============================================================================
+
+- id: Q1
+  question: "Which material numbers have no multi-sourcing strategy (fewer than 2 valid, non-blocked vendors)?"
+  known_good_sql: "SELECT MATNR, WERKS FROM materials_without_multisourcing(2)"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q2
+  question: "Which material numbers are linked to a supplier flagged with delivery risk?"
+  known_good_sql: "SELECT DISTINCT MATNR, WERKS FROM materials_linked_to_risky_supplier(current_date())"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q3
+  question: "Which materials are single-sourced AND their sole supplier has a delivery-risk flag?"
+  known_good_sql: "SELECT MATNR, WERKS, LIFNR FROM single_sourced_risky(current_date())"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q4
+  question: "What is the vendor count per material at each plant?"
+  known_good_sql: "SELECT MATNR, WERKS, vendor_count FROM vendor_count_per_material()"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q5
+  question: "Which suppliers hold a purchasing block but still have active sourcing records?"
+  known_good_sql: "SELECT DISTINCT LIFNR FROM blocked_suppliers_with_active_sourcing()"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q6
+  question: "Which materials have quota arrangements where one vendor holds over 80% of quota?"
+  known_good_sql: "SELECT MATNR, WERKS, LIFNR, QUOTA FROM quota_concentration(80)"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q7
+  question: "What is the on-time delivery rate per supplier over the last 12 months?"
+  known_good_sql: "SELECT LIFNR, otd_rate FROM otd_rate_per_supplier(12)"
+  signature: rowcount
+  space: purchase_order_analytics
+
+- id: Q8
+  question: "Which materials had purchase orders placed with a supplier despite an active delivery-risk flag at order date?"
+  known_good_sql: "SELECT DISTINCT MATNR FROM pos_under_active_risk()"
+  signature: rowcount
+  space: purchase_order_analytics
+
+- id: Q9
+  question: "Which suppliers provide materials across more than one material group?"
+  known_good_sql: "SELECT LIFNR, material_group_count FROM suppliers_multi_material_group()"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q10
+  question: "Which materials have no valid sourcing record at all?"
+  known_good_sql: "SELECT MATNR, WERKS FROM materials_without_valid_sourcing()"
+  signature: rowcount
+  space: sourcing_supplier_risk
+
+- id: Q11
+  question: "What is the average net price variance across vendors for the same material?"
+  known_good_sql: "SELECT MATNR, price_spread FROM net_price_variance_per_material()"
+  signature: rowcount
+  space: purchase_order_analytics
+
+# ---- Additional representative questions (beyond the spec's 11) ----
+- id: QX1
+  question: "How many suppliers currently have an active delivery-risk flag?"
+  known_good_sql: "SELECT COUNT(DISTINCT LIFNR) FROM suppliers_with_delivery_risk(current_date())"
+  signature: scalar
+  space: sourcing_supplier_risk
+
+- id: QX2
+  question: "What is the total number of purchase order lines?"
+  known_good_sql: "SELECT COUNT(*) FROM PURCHASE_ORDER"
+  signature: scalar
+  space: purchase_order_analytics
+
+- id: QX3
+  question: "What is the overall on-time delivery rate across all suppliers?"
+  known_good_sql: "SELECT ROUND(AVG(CASE WHEN ON_TIME_FLAG THEN 1.0 ELSE 0.0 END),4) FROM PURCHASE_ORDER WHERE GR_DATE IS NOT NULL"
+  signature: scalar
+  space: purchase_order_analytics
+
+- id: QX4
+  question: "How many materials are single-sourced (exactly one valid vendor)?"
+  known_good_sql: "SELECT COUNT(*) FROM (SELECT MATNR,WERKS FROM SOURCING WHERE IS_VALID_SOURCE=true GROUP BY MATNR,WERKS HAVING COUNT(*)=1)"
+  signature: scalar
+  space: sourcing_supplier_risk
+
+- id: QX5
+  question: "Which vendor country has the most delivery-risk suppliers?"
+  known_good_sql: "SELECT s.LAND1, COUNT(DISTINCT r.LIFNR) c FROM SUPPLIER_RISK r JOIN SUPPLIER s ON r.LIFNR=s.LIFNR WHERE r.DELIVERY_RISK_FLAG='X' GROUP BY s.LAND1 ORDER BY c DESC LIMIT 1"
+  signature: rowcount
+  space: sourcing_supplier_risk
