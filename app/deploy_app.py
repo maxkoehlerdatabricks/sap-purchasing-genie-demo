@@ -15,6 +15,26 @@
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Ensure a recent Databricks SDK
+# MAGIC The serverless notebook runtime can ship an older `databricks-sdk` that predates
+# MAGIC the Apps API (`databricks.sdk.service.apps`). Upgrade it in-notebook so the deploy
+# MAGIC works on a blank workspace, then restart Python to pick up the new version.
+
+# COMMAND ----------
+
+# MAGIC %pip install --upgrade "databricks-sdk>=0.33.0"
+
+# COMMAND ----------
+
+dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# MAGIC %run ../00_config
+
+# COMMAND ----------
+
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.apps import App, AppResource, AppResourceSqlWarehouse, \
     AppResourceServingEndpoint, AppResourceSqlWarehouseSqlWarehousePermission, \
@@ -88,4 +108,31 @@ print(f"App URL: {app.url}")
 
 # COMMAND ----------
 
-dbutils.notebook.exit(f"deploy_app: SUCCESS — {APP_NAME} deployed.")
+# MAGIC %md
+# MAGIC ## Grant the App's service principal CAN_RUN on the Genie spaces
+# MAGIC The MAS/Genie spaces run as `VIEWER`, so the **caller's** identity is used for the
+# MAGIC query. When the chat tab runs, the caller is the App's service principal — it must
+# MAGIC have at least CAN_RUN on each Genie space, otherwise the chat returns a permission
+# MAGIC error. (Schema SELECT/EXECUTE are already granted in 04a via `account users`.)
+
+# COMMAND ----------
+
+sp_client_id = app.service_principal_client_id
+print(f"App service principal: {sp_client_id}")
+
+space_ids = [r["space_id"] for r in spark.table(CFG.fq("_GENIE_SPACES")).collect()]
+for sid in space_ids:
+    try:
+        # Resolve the numeric permissions object id, then grant CAN_RUN to the App SP.
+        g = w.api_client.do("GET", f"/api/2.0/permissions/genie/{sid}")
+        numeric = g["object_id"].split("/")[-1]
+        w.api_client.do("PATCH", f"/api/2.0/permissions/genie/{numeric}",
+                        body={"access_control_list": [
+                            {"service_principal_name": sp_client_id, "permission_level": "CAN_RUN"}]})
+        print(f"  ✓ granted CAN_RUN on Genie space {sid}")
+    except Exception as e:
+        print(f"  ⚠ could not grant on {sid}: {e}")
+
+# COMMAND ----------
+
+dbutils.notebook.exit(f"deploy_app: SUCCESS — {APP_NAME} deployed and Genie access granted.")

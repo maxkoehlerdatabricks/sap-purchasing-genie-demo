@@ -77,8 +77,24 @@ def run_sql(query: str):
         conn.close()
 
 
+def _json_safe(v):
+    """Coerce warehouse types that FastAPI's default JSON encoder can't handle.
+
+    The SQL connector returns DECIMAL columns as ``decimal.Decimal`` and date/time
+    columns as ``datetime`` objects — neither is JSON-serializable by default, which
+    would surface as a 500. Convert them to plain floats / ISO strings.
+    """
+    import datetime
+    from decimal import Decimal
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, (datetime.date, datetime.datetime)):
+        return v.isoformat()
+    return v
+
+
 def rows_to_records(cols, rows):
-    return [dict(zip(cols, r)) for r in rows]
+    return [{c: _json_safe(v) for c, v in zip(cols, r)} for r in rows]
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +139,7 @@ def otd():
     """On-time delivery rate per supplier (worst 12)."""
     cols, rows = run_sql(f"""
         SELECT Supplier AS supplier,
-               ROUND(MEASURE(`OTD Rate`),3) AS otd_rate,
+               CAST(ROUND(MEASURE(`OTD Rate`),3) AS DOUBLE) AS otd_rate,
                MEASURE(Deliveries) AS deliveries
         FROM {NS}.mv_delivery_performance
         GROUP BY ALL HAVING MEASURE(Deliveries) > 0
@@ -152,7 +168,7 @@ def kpis():
           (SELECT COUNT(*) FROM {NS}.single_sourced_risky(current_date()))  AS single_sourced_risky,
           (SELECT COUNT(DISTINCT LIFNR) FROM {NS}.suppliers_with_delivery_risk(current_date())) AS risky_suppliers,
           (SELECT COUNT(*) FROM {NS}.materials_without_valid_sourcing()) AS no_sourcing,
-          (SELECT ROUND(AVG(CASE WHEN ON_TIME_FLAG THEN 1.0 ELSE 0.0 END),3)
+          (SELECT CAST(ROUND(AVG(CASE WHEN ON_TIME_FLAG THEN 1.0 ELSE 0.0 END),3) AS DOUBLE)
              FROM {NS}.PURCHASE_ORDER WHERE GR_DATE IS NOT NULL) AS overall_otd
     """)
     return JSONResponse(rows_to_records(cols, rows)[0] if rows else {})

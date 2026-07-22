@@ -11,9 +11,12 @@ env:
   # below AND surfaced here as an env var the backend reads.
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
-  # The MAS serving endpoint powering the chat tab.
+  # The MAS serving endpoint powering the chat tab. Derived from the app resource
+  # named "mas-endpoint" (wired in deploy_app.py from the _MAS_ENDPOINT table), so it
+  # always matches the currently-deployed endpoint even after the MAS is recreated
+  # (the endpoint name changes on each recreation).
   - name: MAS_ENDPOINT_NAME
-    value: "mas-655dcd32-endpoint"
+    valueFrom: mas-endpoint
   # Fully-qualified schema the charts read from.
   - name: DEMO_CATALOG
     value: "serverless_stable_7qzrfp_catalog"
