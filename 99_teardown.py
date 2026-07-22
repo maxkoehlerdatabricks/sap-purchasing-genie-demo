@@ -105,7 +105,7 @@ except Exception as e:
 
 # COMMAND ----------
 
-# 3a) Serving endpoint — from _MAS_ENDPOINT if present.
+# 3a) Read the recorded endpoint name (used only as a fallback below).
 endpoint_name = None
 if _table_exists(f"{NS}._MAS_ENDPOINT"):
     try:
@@ -115,18 +115,8 @@ if _table_exists(f"{NS}._MAS_ENDPOINT"):
     except Exception as e:
         print(f"  (could not read _MAS_ENDPOINT: {e})")
 
-if endpoint_name:
-    try:
-        print(f"Deleting serving endpoint '{endpoint_name}'…")
-        w.serving_endpoints.delete(name=endpoint_name)
-        print("  ✓ serving endpoint deleted")
-    except Exception as e:
-        print(f"  (endpoint '{endpoint_name}' not found or already deleted: {e})")
-else:
-    print("  (no endpoint name recorded in _MAS_ENDPOINT)")
 
-
-# 3b) MAS tile — find by name via the tiles API, then delete via the MAS API.
+# 3b) MAS tile — find by name via the tiles API.
 def mas_find_by_name(name):
     page_token = None
     try:
@@ -146,16 +136,30 @@ def mas_find_by_name(name):
     return None
 
 
+# 3c) Delete the MAS tile — this is the correct API and it CASCADES to (removes) the
+# associated serving endpoint. The endpoint cannot be deleted on its own
+# ("Please delete the tile to delete all associated endpoints").
 tile_id = mas_find_by_name(MAS_NAME)
 if tile_id:
     try:
-        print(f"Deleting MAS '{MAS_NAME}' (tile_id={tile_id})…")
-        _do("DELETE", f"/api/2.0/multi-agent-supervisors/{tile_id}")
-        print("  ✓ MAS deleted")
+        print(f"Deleting MAS '{MAS_NAME}' (tile_id={tile_id}) — this also removes its endpoint…")
+        _do("DELETE", f"/api/2.0/tiles/{tile_id}")
+        print("  ✓ MAS tile + endpoint deleted")
     except Exception as e:
         print(f"  (could not delete MAS tile {tile_id}: {e})")
 else:
     print(f"  (MAS '{MAS_NAME}' not found)")
+
+# 3d) Fallback: if the tile was already gone but an orphaned endpoint remains, try to
+# delete it directly (best-effort; normally the tile delete above handles it).
+if endpoint_name:
+    try:
+        w.serving_endpoints.get(name=endpoint_name)
+        print(f"Endpoint '{endpoint_name}' still present — deleting directly…")
+        w.serving_endpoints.delete(name=endpoint_name)
+        print("  ✓ serving endpoint deleted")
+    except Exception:
+        print(f"  (serving endpoint '{endpoint_name}' already removed)")
 
 # COMMAND ----------
 
