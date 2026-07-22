@@ -38,9 +38,9 @@ def run(sql):
 # COMMAND ----------
 
 run(f"""
-CREATE OR REPLACE FUNCTION {NS}.materials_without_multisourcing(min_vendors INT COMMENT 'Minimum valid vendors required to be considered multi-sourced (e.g. 2)')
+CREATE OR REPLACE FUNCTION {NS}.materials_without_multisourcing(min_vendors INT COMMENT 'Minimum valid vendors required to be considered multi-sourced. The standard threshold is 2.')
 RETURNS TABLE (MATNR STRING, WERKS STRING, valid_vendor_count INT)
-COMMENT 'Q1: material+plant combinations with fewer than min_vendors valid, non-blocked vendors (i.e. lacking a multi-sourcing strategy).'
+COMMENT 'Q1: materials with no multi-sourcing strategy — material+plant combinations with fewer than min_vendors valid, non-blocked vendors. The standard threshold is 2 (i.e. single-sourced or unsourced materials lack a multi-sourcing strategy).'
 RETURN
   SELECT MATNR, WERKS, CAST(COUNT(*) AS INT) AS valid_vendor_count
   FROM {NS}.SOURCING
@@ -296,13 +296,38 @@ RETURN
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Parameterless "today" variants for Genie CERTIFIED ANSWERS
-# MAGIC Genie certified-answer functions **do not support DATE arguments**. So for the
-# MAGIC risk questions that are "as of today", we expose no-arg wrappers that default the
-# MAGIC date to `current_date()` internally. The parameterized versions above remain
-# MAGIC available as trusted assets for ad-hoc SQL and time-travel questions.
+# MAGIC ## Parameterless default / "today" variants for Genie CERTIFIED ANSWERS
+# MAGIC Genie certified answers are most reliable when the function takes **no
+# MAGIC arguments** (and Genie certified-answer functions **do not support DATE
+# MAGIC arguments** at all). So we expose no-arg wrappers that bake in the standard
+# MAGIC defaults:
+# MAGIC * `materials_without_multisourcing_default()` → threshold of 2 (Q1).
+# MAGIC * `otd_rate_per_supplier_last_12m()` → 12-month look-back (Q7).
+# MAGIC * the `_today()` risk wrappers → default the date to `current_date()`.
+# MAGIC
+# MAGIC The parameterized versions above remain available as trusted assets for ad-hoc
+# MAGIC SQL and time-travel questions.
 
 # COMMAND ----------
+
+# Q1 no-arg wrapper — bakes in the standard multi-sourcing threshold of 2 so Genie can
+# call it reliably as a certified answer for "which materials have no multi-sourcing
+# strategy?".
+run(f"""
+CREATE OR REPLACE FUNCTION {NS}.materials_without_multisourcing_default()
+RETURNS TABLE (MATNR STRING, WERKS STRING, valid_vendor_count INT)
+COMMENT 'Q1 (default threshold): materials with no multi-sourcing strategy — fewer than the standard 2 valid, non-blocked vendors. No-arg wrapper over materials_without_multisourcing(2) for reliable Genie certified answers.'
+RETURN SELECT * FROM {NS}.materials_without_multisourcing(2)
+""")
+
+# Q7 no-arg wrapper — bakes in the standard 12-month look-back window so Genie can call
+# it reliably as a certified answer for "on-time delivery rate per supplier".
+run(f"""
+CREATE OR REPLACE FUNCTION {NS}.otd_rate_per_supplier_last_12m()
+RETURNS TABLE (LIFNR STRING, deliveries BIGINT, on_time BIGINT, otd_rate DOUBLE)
+COMMENT 'Q7 (last 12 months): on-time delivery rate per supplier over the standard 12-month look-back. No-arg wrapper over otd_rate_per_supplier(12) for reliable Genie certified answers.'
+RETURN SELECT * FROM {NS}.otd_rate_per_supplier(12)
+""")
 
 run(f"""
 CREATE OR REPLACE FUNCTION {NS}.materials_linked_to_risky_supplier_today()
@@ -340,6 +365,10 @@ for f in funcs:
 print("\nSmoke tests:")
 print("Q1 materials_without_multisourcing(2):",
       spark.sql(f"SELECT count(*) c FROM {NS}.materials_without_multisourcing(2)").first()["c"])
+print("Q1 materials_without_multisourcing_default():",
+      spark.sql(f"SELECT count(*) c FROM {NS}.materials_without_multisourcing_default()").first()["c"])
+print("Q7 otd_rate_per_supplier_last_12m():",
+      spark.sql(f"SELECT count(*) c FROM {NS}.otd_rate_per_supplier_last_12m()").first()["c"])
 print("Q3 single_sourced_risky(current_date):",
       spark.sql(f"SELECT count(*) c FROM {NS}.single_sourced_risky(current_date())").first()["c"])
 print("Q6 quota_concentration(80):",

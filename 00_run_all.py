@@ -2,11 +2,12 @@
 # MAGIC %md
 # MAGIC # 00_run_all — TOP-LEVEL Orchestrator (parameterize ONCE here)
 # MAGIC
-# MAGIC This is the **only** notebook where you set `catalog` and `schema`. It declares
-# MAGIC the widgets once and then runs every child notebook in dependency order using
-# MAGIC `dbutils.notebook.run(path, timeout, {"catalog": ..., "schema": ...})`. Child
-# MAGIC notebooks read those same widget names, so the parameters flow through the whole
-# MAGIC pipeline from a single point of control.
+# MAGIC This is the **only** notebook where you set `catalog` and `schema`. It assigns
+# MAGIC those values to plain **Python variables** (`CATALOG = ...`, `SCHEMA = ...`,
+# MAGIC `WAREHOUSE_ID = ...`) and then runs every child notebook in dependency order,
+# MAGIC forwarding those Python variables as the child's parameters. Child notebooks read
+# MAGIC the same names, so the parameters flow through the whole pipeline from a single
+# MAGIC point of control — driven by Python assignments, not inline widget-dict literals.
 # MAGIC
 # MAGIC ## What it runs (in order)
 # MAGIC 1. `_helper/01_simulate_raw_tables`   — generate the 13 RAW_* tables.
@@ -30,21 +31,19 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Declare the widgets ONCE
+# MAGIC ## Set the parameters ONCE — as plain Python variables
+# MAGIC Change these three assignments to point the whole demo at a different
+# MAGIC catalog / schema / warehouse. No widget dictionaries are used anywhere below —
+# MAGIC everything downstream is driven from these Python variables.
 
 # COMMAND ----------
 
-dbutils.widgets.text("catalog", "serverless_stable_7qzrfp_catalog", "Unity Catalog (existing, taken as-is)")
-dbutils.widgets.text("schema", "purchasing_demo", "Schema (created by the demo)")
-dbutils.widgets.text("warehouse_id", "117d425266741646", "Serverless SQL Warehouse ID")
+# ---- The single source of truth for the whole pipeline (Python "X = ..." style) ----
+CATALOG = "serverless_stable_7qzrfp_catalog"   # Unity Catalog (existing, taken as-is)
+SCHEMA = "purchasing_demo"                       # Schema (created by the demo)
+WAREHOUSE_ID = "117d425266741646"               # Serverless SQL Warehouse ID
 
-CATALOG = dbutils.widgets.get("catalog")
-SCHEMA = dbutils.widgets.get("schema")
-WAREHOUSE_ID = dbutils.widgets.get("warehouse_id")
-
-# This dict is forwarded to every child notebook so they all read the same params.
-PARAMS = {"catalog": CATALOG, "schema": SCHEMA, "warehouse_id": WAREHOUSE_ID}
-print(f"Orchestrating with: {PARAMS}")
+print(f"Orchestrating with: catalog={CATALOG}  schema={SCHEMA}  warehouse_id={WAREHOUSE_ID}")
 
 # COMMAND ----------
 
@@ -59,16 +58,19 @@ import time
 DEFAULT_TIMEOUT = 3600
 
 
-def run_child(path: str, timeout: int = DEFAULT_TIMEOUT):
-    """Run a child notebook (relative path) forwarding the shared PARAMS.
+def run_child(path: str, catalog: str = CATALOG, schema: str = SCHEMA,
+              warehouse_id: str = WAREHOUSE_ID, timeout: int = DEFAULT_TIMEOUT):
+    """Run a child notebook (relative path), forwarding the shared Python variables.
 
-    ``dbutils.notebook.run`` starts the child in an ephemeral, isolated context and
-    passes ``PARAMS`` as its widget values — this is exactly how we parameterize the
-    whole demo from a single place.
+    The parameters are taken from the ``CATALOG`` / ``SCHEMA`` / ``WAREHOUSE_ID``
+    Python variables set once above (passed here as default argument values), then
+    assembled into the child's arguments at call time. This keeps the parameterization
+    driven by Python ``X = ...`` assignments rather than an inline widget dictionary.
     """
     print(f"\n{'=' * 70}\n▶ Running: {path}\n{'=' * 70}")
+    args = {"catalog": catalog, "schema": schema, "warehouse_id": warehouse_id}
     t0 = time.time()
-    result = dbutils.notebook.run(path, timeout, PARAMS)
+    result = dbutils.notebook.run(path, timeout, arguments=args)
     dt = time.time() - t0
     print(f"✓ Finished: {path}  ({dt:,.1f}s)  → {result}")
     return result

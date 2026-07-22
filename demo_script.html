@@ -58,16 +58,19 @@
 
   <p class="lead" style="margin-top:26px;">This script is a <strong>click-through of the Databricks
   UI</strong>. Each step says exactly where to click, what to say, and what to point out. Total run
-  time ~20 minutes. You can stop after any section.</p>
+  time ~28 minutes. You can stop after any section.</p>
 
-  <h2 id="toc">Flow <span class="clock">~20 min</span></h2>
+  <h2 id="toc">Flow <span class="clock">~28 min</span></h2>
   <ol class="toc">
     <li><a href="#hook">The hook — a $2M question (1 min)</a></li>
     <li><a href="#catalog">Catalog Explorer — the governed data model (4 min)</a></li>
     <li><a href="#genie1">Genie: Sourcing &amp; Supplier Risk (5 min)</a></li>
     <li><a href="#genie2">Genie: Purchase Order Analytics (3 min)</a></li>
     <li><a href="#mas">Agent Bricks — the Multi-Agent Supervisor (3 min)</a></li>
+    <li><a href="#agents">Under the hood — Agents, the Supervisor, provisioning &amp; auth (3 min)</a></li>
+    <li><a href="#observability">Observability — viewing MAS traces in MLflow (2 min)</a></li>
     <li><a href="#app">The App — one screen for the business (4 min)</a></li>
+    <li><a href="#jobs">Automation — running the pipeline as a Job (2 min)</a></li>
     <li><a href="#close">Close — trust &amp; what it took (1 min)</a></li>
   </ol>
 
@@ -88,6 +91,26 @@
       → <code class="inline">purchasing_demo</code>. Show the list of tables.
       <div class="say">"We simulated a realistic SAP purchasing landscape — 13 raw SAP tables — and
       consolidated them into 5 clean, analysis-ready 'gold' tables."</div>
+      <div class="show">The <strong>5 gold tables</strong> the whole demo runs on. Walk the table below so
+      the audience knows what each one contains and what a single row represents (the "grain").</div>
+      <table>
+        <tr><th>Gold table</th><th>Grain — what one row means</th><th>What it contains</th></tr>
+        <tr><td><code class="inline">MATERIAL</code></td><td>One material at one plant (MATNR + WERKS)</td>
+          <td>Material master consolidated across MARA/MAKT/MARC: description, material type (MTART), material group (MATKL), MRP controller, procurement flags.</td></tr>
+        <tr><td><code class="inline">SUPPLIER</code></td><td>One supplier in one purchasing org (LIFNR + EKORG)</td>
+          <td>Vendor master across LFA1/LFB1/LFM1: name, country (LAND1), purchasing block flag (SPERM), company-code and purchasing-org attributes.</td></tr>
+        <tr><td><code class="inline">SOURCING</code></td><td>One approved material→vendor sourcing link at a plant (MATNR + WERKS + LIFNR)</td>
+          <td>The source list + quota arrangement: which vendors may supply which material at which plant, the quota split (QUOTA), validity dates, and the derived IS_VALID_SOURCE flag.</td></tr>
+        <tr><td><code class="inline">SUPPLIER_RISK</code></td><td>One risk assessment window for a supplier (LIFNR, time-sliced VALID_FROM..VALID_TO)</td>
+          <td>Ariba-styled risk classification: risk category, numeric risk score, and the delivery-risk flag (DELIVERY_RISK_FLAG) with the dates it was active.</td></tr>
+        <tr><td><code class="inline">PURCHASE_ORDER</code></td><td>One purchase-order line item (EBELN + EBELP)</td>
+          <td>PO header + line + history flattened from EKKO/EKPO/EKBE: material, supplier, order date, net price (NETPR), requested vs goods-receipt date, and the derived ON_TIME_FLAG.</td></tr>
+        <tr><td><code class="inline">VALUE_DICTIONARY</code></td><td>One business-term → SAP-code mapping (DOMAIN + CODE)</td>
+          <td>Human labels for cryptic SAP codes (e.g. MTART 'ROH' = raw material, SPERM 'X' = blocked) so Genie can translate plain English to codes.</td></tr>
+      </table>
+      <div class="tip">The 13 <code class="inline">RAW_*</code> tables (MARA, MAKT, MARC, LFA1, LFB1, LFM1, EORD,
+      EQUK, EQUP, SUPPLIER_RISK, EKKO, EKPO, EKBE) are the simulated SAP source; the gold tables above are what
+      the demo actually queries.</div>
     </li>
     <li><span class="click-label">CLICK</span> the <strong>SOURCING</strong> table → <strong>Overview</strong> tab.
       <div class="show">The <strong>table description</strong> and the <strong>column comments</strong> — every
@@ -99,6 +122,27 @@
       <strong>Details / Relationships</strong> view.
       <div class="show">The <strong>primary key</strong> and the <strong>foreign key</strong> to MATERIAL.
       These constraints aren't just documentation — Genie uses them to join correctly.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>View relationships</strong> button (top-right of
+      the table's <strong>Overview</strong>) to open the <strong>Entity-Relationship (ER) diagram</strong>.
+      <div class="show">Catalog Explorer auto-draws the <strong>ER diagram</strong> from the primary/foreign keys —
+      SOURCING in the middle, joined out to MATERIAL and SUPPLIER, with SUPPLIER_RISK and PURCHASE_ORDER
+      hanging off the vendor key. You can also reach it from the schema page → <strong>View relationships</strong>
+      to see all 5 gold tables at once.</div>
+      <div class="say">"The star schema isn't in a slide — Databricks generates it live from the declared keys,
+      so the diagram can never drift from the data."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>Lineage</strong> tab on a gold table (e.g.
+      <code class="inline">SOURCING</code>), then open the <strong>Lineage graph</strong>.
+      <div class="show">The upstream <code class="inline">RAW_*</code> tables → the gold table → downstream
+      consumers (the metric views, Genie spaces, and the App). Click a node to expand, and switch to
+      <strong>column-level lineage</strong> to trace a single field (e.g. how IS_VALID_SOURCE is derived).</div>
+      <div class="say">"Every gold table carries automatic, end-to-end lineage — you can prove exactly which raw
+      SAP fields feed a KPI, which is gold for audit and impact analysis."</div>
+      <div class="tip">Note: <strong>external lineage</strong> in Databricks refers to bringing lineage from
+      <em>outside</em> systems into Unity Catalog (e.g. from an external ETL tool or the source SAP system),
+      so UC can show a connected picture that spans beyond Databricks — not just the lineage captured
+      natively within the workspace.</div>
     </li>
     <li><span class="click-label">CLICK</span> into <strong>Functions</strong> in the schema. Open e.g.
       <code class="inline">materials_without_multisourcing</code>.
@@ -138,7 +182,7 @@
       <div class="say">"This is the $2M question from the start. Seconds, in plain English."</div>
     </li>
     <li><span class="click-label">TYPE</span> a follow-up to show conversational memory:
-      <span class="ask">Of those, which are at plant 1030?</span>
+      <span class="ask">Which plants are affected?</span>
       <div class="show">Genie keeps context and refines the previous answer.</div>
     </li>
     <li><span class="click-label">TYPE</span> a governance question:
@@ -188,12 +232,95 @@
       brain the app will talk to."</div>
     </li>
     <li><span class="click-label">SHOW</span> (optional) the <strong>serving endpoint</strong> under
-      Serving — it's deployed and queryable like any model endpoint.</div>
+      Serving — it's deployed and queryable like any model endpoint.
     </li>
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="app">6 · The App — one screen for the business <span class="clock">4 min</span></h2>
+  <h2 id="agents">6 · Under the hood — Agents, the Supervisor, provisioning &amp; auth <span class="clock">3 min</span></h2>
+  <p>This section is for the technical audience — it explains <em>what</em> we just demoed and <em>how</em> it
+  is wired. Stay in the <strong>Agents</strong> area; refer back to the notebooks as needed.</p>
+
+  <h3>What an "Agent" is in Databricks</h3>
+  <div class="show">An <strong>Agent</strong> is an LLM app that reasons and <strong>calls tools</strong> in a loop —
+  SQL / UC functions, vector search, Genie spaces, or external APIs. Agents are authored with the
+  <strong>Mosaic AI Agent Framework</strong> (<code class="inline">ChatAgent</code> /
+  <code class="inline">ResponsesAgent</code>), logged to <strong>MLflow</strong>, registered in
+  <strong>Unity Catalog</strong>, and deployed to a <strong>Model Serving endpoint</strong>.</div>
+  <div class="say">"In <strong>Agent Bricks</strong> — the low-code path we used here — you declaratively configure
+  managed agents instead of writing the framework code. Each <strong>Genie space acts as a specialist
+  agent</strong>."</div>
+
+  <h3>The Supervisor (Multi-Agent Supervisor / MAS)</h3>
+  <div class="show">The <strong>Supervisor</strong> is an orchestrator agent sitting <em>above</em> multiple
+  sub-agents: it <strong>routes each request</strong> to the right one and <strong>synthesizes</strong> the
+  answer. Here it supervises the two Genie spaces (<strong>PO Analytics</strong> vs
+  <strong>Sourcing &amp; Supplier Risk</strong>), deployed as a single endpoint
+  (<code class="inline">mas-655dcd32-endpoint</code>). It speaks the <strong>Responses API</strong>
+  (<code class="inline">{"input":[{"role":"user","content":"…"}]}</code>) and emits a
+  <code class="inline">function_call</code> naming the routed sub-agent — which the App parses to show the
+  "routed to …" badge.</div>
+
+  <h3>Provisioning</h3>
+  <div class="show">Provisioning is <strong>declarative REST</strong> in
+  <code class="inline">06_agent/06a_create_mas.py</code>:
+  <code class="inline">POST /api/2.0/multi-agent-supervisors</code> with
+  <code class="inline">{name, agents:[{name, description, agent_type:"genie", genie_space:{id}}], instructions}</code>.
+  The Genie space IDs come from the <code class="inline">_GENIE_SPACES</code> table (written by
+  <code class="inline">05a</code>). Databricks <strong>auto-provisions the serving endpoint</strong>; the
+  notebook polls <code class="inline">serving_endpoints.get(name).state.ready == READY</code> (not the MAS tile
+  status), and persists the endpoint name to <code class="inline">_MAS_ENDPOINT</code>.</div>
+
+  <h3>Authentication</h3>
+  <div class="show">There are <strong>two auth boundaries</strong>:
+    <ol>
+      <li><strong>Caller → MAS endpoint:</strong> locally uses the CLI profile via
+        <code class="inline">WorkspaceClient()</code>; in the deployed App it runs as a
+        <strong>service principal</strong> with injected env, and the backend calls
+        <code class="inline">w.config.authenticate()</code> to get a Bearer header (works for PAT / OAuth / SP
+        with no code change — <strong>no hard-coded tokens</strong>).</li>
+      <li><strong>MAS / Genie → data:</strong> the Genie spaces use
+        <code class="inline">run_as_type: "VIEWER"</code>, so queries execute as the <strong>end-user's
+        identity</strong> and per-user UC permissions are enforced.</li>
+    </ol></div>
+  <div class="say">"The trade-offs: <strong>least privilege</strong> — the endpoint only needs CAN QUERY plus UC
+  grants. <strong>VIEWER</strong> run-as preserves per-user governance and audit, versus service-principal
+  run-as which centralizes access but loses per-user enforcement. And a <strong>single MAS endpoint</strong>
+  means one ACL choke point and a smaller blast radius."</div>
+
+  <!-- ============================================================ -->
+  <h2 id="observability">7 · Observability — viewing MAS traces in MLflow <span class="clock">2 min</span></h2>
+  <div class="say">"Governance isn't just access control — it's being able to see exactly what the AI did.
+  Every question the supervisor answers is captured as an MLflow trace."</div>
+  <div class="show"><strong>Why:</strong> every MAS invocation is <strong>auto-captured as an MLflow trace</strong>
+  (the Agent Framework auto-instruments MLflow Tracing) — showing the supervisor's <strong>routing decision</strong>
+  (which Genie sub-agent), the <strong>generated SQL</strong>, the tool/span tree, <strong>latency</strong>, and
+  <strong>token usage</strong>. Great for demonstrating governance and observability.</div>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> <strong>Path 1 — Serving endpoint (primary):</strong>
+      Machine Learning → <strong>Serving</strong> → open <code class="inline">mas-655dcd32-endpoint</code> →
+      the <strong>Traces</strong> tab (a.k.a. inference logs / monitoring).
+      <div class="show">Each row is one invocation; expand it to see the routing, the generated SQL, the spans,
+      latency and tokens. Best for answering "why did it route here / what SQL ran?"</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Path 2 — MLflow Experiment:</strong>
+      <strong>Experiments</strong> → open the experiment tied to the MAS deployment → the <strong>Traces</strong>
+      tab.
+      <div class="show">Inspect the full <strong>span tree</strong> (supervisor span → Genie sub-agent span → SQL
+      execution span); filter by status/time to find failures or slow calls.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Path 3 — Complementary:</strong> the exact SQL Genie ran
+      also appears in <strong>Query History</strong> for warehouse
+      <code class="inline">117d425266741646</code>.
+    </li>
+  </ol>
+  <div class="tip"><strong>Demo tip:</strong> after asking the MAS a question in the App chat, switch to
+  Serving → <strong>Traces</strong> to show the routing + SQL <em>live</em>, and tie it back to the
+  <code class="inline">function_call</code> (the routed sub-agent name) that the app backend parses in
+  <code class="inline">app/backend/main.py</code>.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="app">8 · The App — one screen for the business <span class="clock">4 min</span></h2>
   <p>Left nav → <strong>Apps</strong> → open <strong>"sap-purchasing-app."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the <strong>Visualizations</strong> tab.
@@ -217,7 +344,37 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="close">7 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
+  <h2 id="jobs">9 · Automation — running the pipeline as a Job <span class="clock">2 min</span></h2>
+  <p>Left nav → <strong>Workflows</strong> → <strong>Jobs</strong> → open
+  <strong>"sap_purchasing_data_prep."</strong></p>
+  <ol class="clicks">
+    <li><span class="click-label">SHOW</span> the job's <strong>Tasks</strong> tab.
+      <div class="show">A single serverless task, <code class="inline">data_prep</code>, that runs the top-level
+      <code class="inline">00_run_all</code> orchestrator. No cluster is configured → it runs on
+      <strong>serverless</strong> compute. Point out the <strong>base parameters</strong>
+      (<code class="inline">catalog</code>, <code class="inline">schema</code>,
+      <code class="inline">warehouse_id</code>) — the same Python variables that parameterize the manual run.</div>
+      <div class="say">"The job doesn't duplicate any logic — it just invokes the exact same orchestrator we run
+      by hand, so the scheduled pipeline and the manual run stay in lock-step."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Run now</strong> (top-right) to trigger a run, then open
+      the <strong>Runs</strong> tab.
+      <div class="show">The run list with status and duration. Click into a run to see the
+      <strong>task graph</strong>, live logs, and the notebook output for each stage (raw → gold → semantics).</div>
+    </li>
+    <li><span class="click-label">SHOW</span> (optional) <strong>Schedules &amp; Triggers</strong> in the job's
+      right-hand panel.
+      <div class="say">"From here you'd add a cron schedule or a file-arrival trigger to refresh the gold
+      layer automatically — the same notebooks, now hands-off."</div>
+    </li>
+  </ol>
+  <div class="tip">The job is created/updated idempotently by
+  <code class="inline">08_jobs/08a_create_jobs</code> (Python SDK, by job name). If you don't see it, run that
+  notebook once. To trigger from code instead of the UI, uncomment the
+  <code class="inline">run_now_and_wait</code> cell at the bottom of that notebook.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="close">10 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
   <div class="say">"To make natural language trustworthy, we grounded it: documented tables with keys,
   KPIs defined once as metric views, business rules as certified functions, and a benchmark that scores
   the agent's answers against known-good SQL — it scored <strong>100%</strong> on our question set."</div>
@@ -247,9 +404,10 @@
   <div class="setup">
     Ensure these have been run (once): <code class="inline">00_run_all</code> (data + semantics) →
     <code class="inline">04a_resources</code> → <code class="inline">05a_create_genie_spaces</code> →
-    <code class="inline">06a_create_mas</code> → <code class="inline">07a_benchmark</code> → deploy the app
-    (<code class="inline">app/deploy_app</code>). Open both Genie spaces, the supervisor, and the app in
-    separate browser tabs before you start so switching is instant. Warm the SQL warehouse with one query
+    <code class="inline">06a_create_mas</code> → <code class="inline">07a_benchmark</code> →
+    <code class="inline">08a_create_jobs</code> (the data-prep Job) → deploy the app
+    (<code class="inline">app/deploy_app</code>). Open both Genie spaces, the supervisor, the job, and the app
+    in separate browser tabs before you start so switching is instant. Warm the SQL warehouse with one query
     so the first Genie answer isn't waiting on a cold start.
   </div>
 

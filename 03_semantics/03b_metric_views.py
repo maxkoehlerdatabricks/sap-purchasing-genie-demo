@@ -54,24 +54,32 @@ joins:
 dimensions:
   - name: Plant
     expr: source.WERKS
-    comment: "Plant (WERKS)"
+    comment: "Plant the sourcing record applies to (SAP WERKS)."
   - name: Material
     expr: source.MATNR
+    comment: "Material number being sourced (SAP MATNR)."
   - name: Material Group
     expr: mat.MATKL
+    comment: "Purchasing material group the material belongs to (SAP MATKL), joined from MATERIAL."
   - name: Material Type
     expr: mat.MTART
+    comment: "Material type such as ROH=raw / HALB=semi-finished (SAP MTART), joined from MATERIAL."
   - name: Is Valid Source
     expr: source.IS_VALID_SOURCE
+    comment: "True when the source-list entry is currently valid and the vendor is not blocked."
 measures:
   - name: Sourcing Records
     expr: COUNT(1)
+    comment: "Count of source-list rows (material+plant+vendor combinations)."
   - name: Distinct Vendors
     expr: COUNT(DISTINCT source.LIFNR)
+    comment: "Number of distinct vendors appearing in the sourcing records (any status)."
   - name: Valid Vendors
     expr: COUNT(DISTINCT CASE WHEN source.IS_VALID_SOURCE THEN source.LIFNR END)
+    comment: "Number of distinct valid, non-blocked vendors — the basis for multi-sourcing."
   - name: Distinct Materials
     expr: COUNT(DISTINCT source.MATNR)
+    comment: "Number of distinct materials that have at least one sourcing record."
 $$
 """)
 
@@ -100,23 +108,32 @@ joins:
 dimensions:
   - name: Risk Category
     expr: source.RISK_CATEGORY
+    comment: "Risk classification bucket assigned to the supplier (e.g. financial, delivery, quality)."
   - name: Delivery Risk Flag
     expr: source.DELIVERY_RISK_FLAG
+    comment: "'X' when the supplier carries an active delivery-risk flag; blank/NULL otherwise."
   - name: Vendor Country
     expr: sup.LAND1
+    comment: "Vendor's country key (SAP LAND1), joined from SUPPLIER."
   - name: Valid From
     expr: source.VALID_FROM
+    comment: "Start date of the risk assessment's validity window (time-slice start)."
 measures:
   - name: Risk Assessments
     expr: COUNT(1)
+    comment: "Count of supplier risk-assessment rows (time-sliced records)."
   - name: Distinct Vendors
     expr: COUNT(DISTINCT source.LIFNR)
+    comment: "Number of distinct vendors that have at least one risk assessment."
   - name: Delivery Risk Vendors
     expr: COUNT(DISTINCT CASE WHEN source.DELIVERY_RISK_FLAG = 'X' THEN source.LIFNR END)
+    comment: "Number of distinct vendors currently flagged with delivery risk (DELIVERY_RISK_FLAG='X')."
   - name: Avg Risk Score
     expr: AVG(source.RISK_SCORE)
+    comment: "Average numeric risk score across the selected risk assessments."
   - name: Max Risk Score
     expr: MAX(source.RISK_SCORE)
+    comment: "Highest (worst) numeric risk score across the selected risk assessments."
 $$
 """)
 
@@ -142,19 +159,26 @@ filter: GR_DATE IS NOT NULL
 dimensions:
   - name: Supplier
     expr: LIFNR
+    comment: "Vendor/supplier that delivered the PO line (SAP LIFNR)."
   - name: Purchasing Org
     expr: EKORG
+    comment: "Purchasing organization responsible for the order (SAP EKORG)."
   - name: Receipt Month
     expr: DATE_TRUNC('MONTH', GR_DATE)
+    comment: "Calendar month of goods receipt (GR_DATE truncated to month)."
   - name: Order Month
     expr: DATE_TRUNC('MONTH', ORDER_DATE)
+    comment: "Calendar month the PO was placed (ORDER_DATE truncated to month)."
 measures:
   - name: Deliveries
     expr: COUNT(1)
+    comment: "Count of received PO lines (rows where GR_DATE is not null, per the view filter)."
   - name: On Time Deliveries
     expr: SUM(CASE WHEN ON_TIME_FLAG THEN 1 ELSE 0 END)
+    comment: "Count of received lines that arrived on or before the requested date (ON_TIME_FLAG=true)."
   - name: OTD Rate
     expr: AVG(CASE WHEN ON_TIME_FLAG THEN 1.0 ELSE 0.0 END)
+    comment: "On-time delivery rate = on-time lines / received lines (0..1)."
 $$
 """)
 
@@ -179,21 +203,29 @@ source: {NS}.PURCHASE_ORDER
 dimensions:
   - name: Material
     expr: MATNR
+    comment: "Material number the PO line is for (SAP MATNR)."
   - name: Supplier
     expr: LIFNR
+    comment: "Vendor/supplier on the PO line (SAP LIFNR)."
   - name: Purchasing Org
     expr: EKORG
+    comment: "Purchasing organization that placed the order (SAP EKORG)."
 measures:
   - name: PO Lines
     expr: COUNT(1)
+    comment: "Count of purchase-order line items in scope."
   - name: Avg Net Price
     expr: AVG(NETPR)
+    comment: "Average net unit price across the selected PO lines (SAP NETPR)."
   - name: Min Net Price
     expr: MIN(NETPR)
+    comment: "Lowest net unit price observed across the selected PO lines."
   - name: Max Net Price
     expr: MAX(NETPR)
+    comment: "Highest net unit price observed across the selected PO lines."
   - name: Total Spend
     expr: SUM(NETPR)
+    comment: "Sum of net prices across the selected PO lines (proxy for spend)."
 $$
 """)
 

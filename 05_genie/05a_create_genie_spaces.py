@@ -160,12 +160,15 @@ add_sql(s1, "Q3 single-sourced & currently risky",
     "AND current_date() BETWEEN r.VALID_FROM AND r.VALID_TO")
 add_sql(s1, "Q6 quota concentration >80%",
     "SELECT MATNR,WERKS,LIFNR,QUOTA FROM SOURCING WHERE QUOTA IS NOT NULL AND QUOTA>80")
+add_sql(s1, "Q1 materials without multi-sourcing (threshold 2)",
+    f"SELECT * FROM {NS}.materials_without_multisourcing(2)")
 
 # ---- 3) CERTIFIED_ANSWERS — trusted SQL functions (add LAST) ----
-# NOTE: Genie certified-answer functions do NOT support DATE arguments, so for the
-# time-sliced risk questions we register the no-arg "_today" variants (which default
-# the date to current_date() internally). INT-arg functions are fine.
-for fn in ["materials_without_multisourcing",            # INT arg — OK
+# NOTE: Genie certified answers are most reliable with NO-ARG functions, and
+# certified-answer functions do NOT support DATE arguments. So for Q1 we register the
+# no-arg default wrapper (threshold baked to 2) and for the time-sliced risk questions
+# we register the no-arg "_today" variants (which default the date to current_date()).
+for fn in ["materials_without_multisourcing_default",    # Q1 no-arg wrapper (threshold=2)
            "materials_linked_to_risky_supplier_today",   # no-arg today variant
            "single_sourced_risky_today",                 # no-arg today variant
            "vendor_count_per_material",                   # no arg
@@ -224,7 +227,9 @@ add_text(s2, "Price & order-under-risk",
     "(DELIVERY_RISK_FLAG='X' and ORDER_DATE BETWEEN VALID_FROM AND VALID_TO).")
 
 # ---- 2) SQL_INSTRUCTIONS ----
-add_sql(s2, "Q7 OTD rate per supplier (12 months)",
+add_sql(s2, "Q7 OTD rate per supplier (via trusted function)",
+    f"SELECT * FROM {NS}.otd_rate_per_supplier(12)")
+add_sql(s2, "Q7 OTD rate per supplier (12 months, inline)",
     "SELECT LIFNR, COUNT(*) deliveries, "
     "ROUND(AVG(CASE WHEN ON_TIME_FLAG THEN 1.0 ELSE 0.0 END),3) otd_rate "
     "FROM PURCHASE_ORDER WHERE GR_DATE IS NOT NULL AND "
@@ -239,7 +244,9 @@ add_sql(s2, "Q11 net price variance per material",
     "FROM pv GROUP BY MATNR HAVING COUNT(*)>1 ORDER BY spread DESC")
 
 # ---- 3) CERTIFIED_ANSWERS ----
-for fn in ["otd_rate_per_supplier", "pos_under_active_risk", "net_price_variance_per_material"]:
+# Q7 uses the no-arg wrapper (12-month window baked in) for reliable certified answers,
+# in place of the INT-arg otd_rate_per_supplier(months) version.
+for fn in ["otd_rate_per_supplier_last_12m", "pos_under_active_risk", "net_price_variance_per_material"]:
     add_function(s2, f"{NS}.{fn}")
 
 # ---- Sample questions ----

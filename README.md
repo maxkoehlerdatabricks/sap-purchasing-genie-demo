@@ -105,6 +105,7 @@ sap-purchasing-genie-demo/
   08_jobs/
     08a_create_jobs.py              # SEPARATE serverless data-prep Job (Python SDK)
   app/                              # Databricks App (React + FastAPI)
+  99_teardown.py                    # DELETE every asset the demo creates (app, job, MAS, Genie, schema)
   demo_script.html                  # comprehensive demo walkthrough
 ```
 
@@ -131,11 +132,19 @@ create Genie spaces + Agent Bricks + serving endpoints + Apps.
    Job (it just calls `00_run_all`).
 8. **App** — see `app/README.md` for the local devloop and deploy steps.
 
+### Teardown
+Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates —
+the App, the data-prep Job, the MAS + serving endpoint, both Genie spaces, and the entire
+schema (`DROP SCHEMA … CASCADE`, which removes all gold/raw tables, metric views, SQL
+functions and the `_*` metadata tables). The **catalog** and the **SQL warehouse** are left
+in place (neither is created by the demo). Remove the workspace source folders separately via
+the Workspace UI or `databricks workspace delete … --recursive`.
+
 ### Parameterization
-`00_config.py` defines defaults and reads widgets. `00_run_all.py` declares the widgets
-**once** and forwards them to every child notebook via
-`dbutils.notebook.run(path, timeout, {"catalog":…, "schema":…})`. The **catalog is taken
-as-is**; the **schema is created**.
+`00_config.py` defines defaults and reads widgets. `00_run_all.py` sets `catalog` / `schema` /
+`warehouse_id` as plain **Python variables once** (`CATALOG = …`, `SCHEMA = …`) and forwards
+those variables to every child notebook when it runs them. The **catalog is taken as-is**;
+the **schema is created**.
 
 ---
 

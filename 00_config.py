@@ -8,9 +8,9 @@
 # MAGIC
 # MAGIC ## How parameterization works (read this!)
 # MAGIC * The demo is designed to be **parameterized in exactly one place**: the top-level
-# MAGIC   orchestrator `00_run_all`. That orchestrator declares widgets **once** and then
-# MAGIC   passes `catalog` and `schema` into every child notebook via
-# MAGIC   `dbutils.notebook.run(path, timeout, {"catalog": ..., "schema": ...})`.
+# MAGIC   orchestrator `00_run_all`. That orchestrator sets `catalog` / `schema` as plain
+# MAGIC   Python variables **once** (`CATALOG = ...`, `SCHEMA = ...`) and forwards those
+# MAGIC   variables into every child notebook when it runs them.
 # MAGIC * Every notebook (including this one) `%run`s or imports these values by reading
 # MAGIC   its own widgets. When a notebook is run standalone, the widget defaults below
 # MAGIC   kick in, so you can also run any notebook on its own for debugging.
