@@ -45,8 +45,12 @@
     <p>Persona: a <strong>purchasing business analyst</strong> answering sourcing-risk &amp;
     supply-continuity questions in plain English — without SAP access.</p>
     <div>
+      <span class="pill">Genie One</span>
       <span class="pill">Catalog Explorer</span>
       <span class="pill">Genie ×2</span>
+      <span class="pill">Notebook + Genie assistant</span>
+      <span class="pill">SQL AI assistant</span>
+      <span class="pill">Visual Data Prep</span>
       <span class="pill">Metric Views</span>
       <span class="pill">Agent Bricks (MAS)</span>
       <span class="pill">Databricks App</span>
@@ -58,10 +62,11 @@
 
   <p class="lead" style="margin-top:26px;">This script is a <strong>click-through of the Databricks
   UI</strong>. Each step says exactly where to click, what to say, and what to point out. Total run
-  time ~28 minutes. You can stop after any section.</p>
+  time ~41 minutes. You can stop after any section.</p>
 
-  <h2 id="toc">Flow <span class="clock">~28 min</span></h2>
+  <h2 id="toc">Flow <span class="clock">~41 min</span></h2>
   <ol class="toc">
+    <li><a href="#genie-one">Genie One — ask in plain English before anything else (3 min)</a></li>
     <li><a href="#hook">The hook — a $2M question (1 min)</a></li>
     <li><a href="#catalog">Catalog Explorer — the governed data model (4 min)</a></li>
     <li><a href="#genie1">Genie: Sourcing &amp; Supplier Risk (5 min)</a></li>
@@ -69,13 +74,50 @@
     <li><a href="#mas">Agent Bricks — the Multi-Agent Supervisor (3 min)</a></li>
     <li><a href="#agents">Under the hood — Agents, the Supervisor, provisioning &amp; auth (3 min)</a></li>
     <li><a href="#observability">Observability — viewing MAS traces in MLflow (2 min)</a></li>
+    <li><a href="#dataprep">Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep (8 min)</a></li>
+    <li><a href="#dashboard">AI/BI Dashboard — a filter and two charts (3 min)</a></li>
     <li><a href="#app">The App — one screen for the business (4 min)</a></li>
     <li><a href="#jobs">Automation — running the pipeline as a Job (2 min)</a></li>
     <li><a href="#close">Close — trust &amp; what it took (1 min)</a></li>
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="hook">1 · The hook — a $2M question <span class="clock">1 min</span></h2>
+  <h2 id="genie-one">1 · Genie One — ask in plain English before anything else <span class="clock">3 min</span></h2>
+  <p>Open Genie from the <strong>left nav → Genie</strong> (the single, unified entry). This is the very first
+  thing the audience sees — no data model, no SQL, no setup. Just a question box over the governed data.</p>
+  <div class="say">"Before I show you a single table, let me show you the end state. This is Genie — one place in
+  Databricks where anyone can ask a question in plain English. No SAP screen, no report request, no analyst in
+  the loop."</div>
+  <ol class="clicks">
+    <li><span class="click-label">SHOW</span> the unified <strong>Genie</strong> landing page.
+      <div class="show">There's <strong>one Genie</strong> — the audience doesn't have to know which space or table
+      to pick. Point out that Genie can be pointed at the whole <code class="inline">purchasing_demo</code> schema,
+      and that later in the demo we'll show two <em>curated</em> spaces plus a supervisor that route automatically.</div>
+      <div class="say">"Think of this as the front door. One box. Everything else we build today — the governed
+      tables, the certified functions, the metric views, the supervisor — exists so that the answers coming out
+      of this box are ones you can actually trust."</div>
+    </li>
+    <li><span class="click-label">TYPE</span> the headline question in plain English:
+      <span class="ask">Which materials are single-sourced and their only supplier has a delivery-risk flag?</span>
+      <div class="show">The answer returns in seconds — a ranked list of the highest-priority supply-continuity risks.
+      Expand <strong>"Show generated code"</strong> so they see Genie wrote and ran real SQL against Unity Catalog.</div>
+      <div class="say">"That's the $2M question — answered in seconds, by anyone, without waiting on a specialist.
+      Now let me peel back the layers and show you why you can trust this answer."</div>
+    </li>
+    <li><span class="click-label">TYPE</span> one quick follow-up to prove it's conversational:
+      <span class="ask">Which plants are affected?</span>
+      <div class="show">Genie keeps the context from the previous question and narrows the same result set — no
+      re-stating the whole question.</div>
+    </li>
+  </ol>
+  <div class="tip">This is deliberately the <strong>same flagship question</strong> we return to in the scoped Genie
+  space (section 4) and the App (section 11). Showing it here first sets the "so what," and every later section
+  answers "why should I believe it?" — governance, agents, observability, and how the data was built.</div>
+  <div class="tip"><strong>Pre-warm:</strong> ask this question once before the demo so the warehouse is hot and the
+  first live answer returns instantly.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="hook">2 · The hook — a $2M question <span class="clock">1 min</span></h2>
   <div class="say">"Imagine one part on your assembly line comes from a single supplier — and that
   supplier just got flagged for delivery risk. If they slip, the line stops. Today, finding those
   parts means waiting on an SAP specialist. Let me show you how a purchasing analyst answers that in
@@ -84,7 +126,7 @@
   dependency on SAP experts for everyday sourcing-risk questions.</div>
 
   <!-- ============================================================ -->
-  <h2 id="catalog">2 · Catalog Explorer — the governed data model <span class="clock">4 min</span></h2>
+  <h2 id="catalog">3 · Catalog Explorer — the governed data model <span class="clock">4 min</span></h2>
   <p>Start in the Databricks UI left nav → <strong>Catalog</strong>.</p>
   <ol class="clicks">
     <li><span class="click-label">CLICK</span> Catalog → <code class="inline">serverless_stable_7qzrfp_catalog</code>
@@ -160,7 +202,7 @@
   keys, certified functions, and consistent metrics — the foundation that makes the AI layer trustworthy.</div>
 
   <!-- ============================================================ -->
-  <h2 id="genie1">3 · Genie: Sourcing &amp; Supplier Risk <span class="clock">5 min</span></h2>
+  <h2 id="genie1">4 · Genie: Sourcing &amp; Supplier Risk <span class="clock">5 min</span></h2>
   <p>Left nav → <strong>Genie</strong> → open <strong>"SAP Purchasing — Sourcing &amp; Supplier Risk."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the space landing page.
@@ -196,7 +238,7 @@
   and the certified functions attached.</div>
 
   <!-- ============================================================ -->
-  <h2 id="genie2">4 · Genie: Purchase Order Analytics <span class="clock">3 min</span></h2>
+  <h2 id="genie2">5 · Genie: Purchase Order Analytics <span class="clock">3 min</span></h2>
   <p>Open the second space — <strong>"SAP Purchasing — Purchase Order Analytics."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">TYPE</span> <span class="ask">What is the on-time delivery rate per
@@ -216,7 +258,7 @@
   pick the right space — so we put a supervisor in front."</div>
 
   <!-- ============================================================ -->
-  <h2 id="mas">5 · Agent Bricks — the Multi-Agent Supervisor <span class="clock">3 min</span></h2>
+  <h2 id="mas">6 · Agent Bricks — the Multi-Agent Supervisor <span class="clock">3 min</span></h2>
   <p>Left nav → <strong>Agents</strong> (Agent Bricks) → open <strong>"sap_purchasing_supervisor."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the supervisor's config.
@@ -237,7 +279,7 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="agents">6 · Under the hood — Agents, the Supervisor, provisioning &amp; auth <span class="clock">3 min</span></h2>
+  <h2 id="agents">7 · Under the hood — Agents, the Supervisor, provisioning &amp; auth <span class="clock">3 min</span></h2>
   <p>This section is for the technical audience — it explains <em>what</em> we just demoed and <em>how</em> it
   is wired. Stay in the <strong>Agents</strong> area; refer back to the notebooks as needed.</p>
 
@@ -289,7 +331,7 @@
   means one ACL choke point and a smaller blast radius."</div>
 
   <!-- ============================================================ -->
-  <h2 id="observability">7 · Observability — viewing MAS traces in MLflow <span class="clock">2 min</span></h2>
+  <h2 id="observability">8 · Observability — viewing MAS traces in MLflow <span class="clock">2 min</span></h2>
   <div class="say">"Governance isn't just access control — it's being able to see exactly what the AI did.
   Every question the supervisor answers is captured as an MLflow trace."</div>
   <div class="show"><strong>Why:</strong> every MAS invocation is <strong>auto-captured as an MLflow trace</strong>
@@ -320,7 +362,159 @@
   <code class="inline">app/backend/main.py</code>.</div>
 
   <!-- ============================================================ -->
-  <h2 id="app">8 · The App — one screen for the business <span class="clock">4 min</span></h2>
+  <h2 id="dataprep">9 · Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep <span class="clock">8 min</span></h2>
+  <p>Everything so far ran on the governed <strong>gold tables</strong>. This section shows that the people who
+  <em>author</em> against those tables get the same AI assistance the business gets — three ways in: a notebook, the
+  SQL editor, and a no-code canvas. These are <strong>quick concept demos</strong>, not a build step: each one is a
+  small example that <strong>previews a result and writes nothing</strong> — no tables are created, so it's safe to
+  run live and safe to re-run.</p>
+  <div class="say">"You've seen the business ask questions in plain English. Now let me show you that the people
+  building these datasets get the same AI assistance — whether they live in a notebook, the SQL editor, or a
+  no-code canvas. I'll keep these small — just enough to show the idea, nothing saved."</div>
+
+  <h3>9a · Prepare a dataset in a notebook with the Assistant</h3>
+  <p>Left nav → <strong>Workspace</strong> → open a new (or scratch) <strong>notebook</strong> on serverless.</p>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> the <strong>Assistant</strong> icon in the notebook (the sparkle in
+      the cell toolbar / right-hand panel), or start a cell comment and press the assistant shortcut.
+      <div class="show">The <strong>Databricks Assistant</strong> is context-aware — it already knows the tables and
+      columns in <code class="inline">purchasing_demo</code> from Unity Catalog, so it writes code that references
+      real column names, not guesses.</div>
+    </li>
+    <li><span class="click-label">TYPE</span> a small plain-English prompt into the Assistant:
+      <span class="ask">Read supplier and supplier_risk from serverless_stable_7qzrfp_catalog.purchasing_demo,
+      join on LIFNR, and show the 10 suppliers with the highest risk score — name, country, risk category, risk
+      score. Just display it, don't save anything.</span>
+      <div class="show">The Assistant generates a <strong>PySpark cell</strong> — reading
+      <code class="inline">supplier</code> and <code class="inline">supplier_risk</code>, joining on
+      <code class="inline">LIFNR</code>, ordering by <code class="inline">RISK_SCORE</code>, and ending in
+      <code class="inline">.display()</code>. Point out it picked the correct join key and columns because UC
+      metadata grounds it.</div>
+      <div class="say">"I described the outcome in one sentence. The Assistant wrote correct PySpark against our
+      real schema — because it's reading Unity Catalog, not hallucinating column names."</div>
+    </li>
+    <li><span class="click-label">RUN</span> the cell.
+      <div class="show">The result renders inline as a <strong>DataFrame preview</strong> — nothing is written to the
+      catalog. This is purely to show AI-assisted authoring; there's no <code class="inline">saveAsTable</code>.</div>
+      <div class="tip">If the Assistant panel isn't visible, enable <em>Databricks Assistant</em> in the workspace
+      settings. You can also select the generated cell and use <strong>/explain</strong> to show it documenting the
+      code, or <strong>/fix</strong> to show it debugging — not just generating.</div>
+    </li>
+  </ol>
+
+  <h3>9b · Write SQL from a prompt with the SQL editor's AI assistant</h3>
+  <p>Left nav → <strong>SQL Editor</strong>. Pick the warehouse <code class="inline">Serverless Starter Warehouse</code>
+  and set the catalog/schema to <code class="inline">serverless_stable_7qzrfp_catalog</code> /
+  <code class="inline">purchasing_demo</code>.</p>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> the <strong>Assistant</strong> (sparkle) in the SQL editor, or type
+      a comment prompt and trigger inline generation.
+      <div class="show">The same context-aware assistant, now producing <strong>SQL</strong> instead of PySpark. This
+      is the analyst path — no Python needed.</div>
+    </li>
+    <li><span class="click-label">TYPE</span> a small prompt:
+      <span class="ask">Show the 10 suppliers with the worst on-time delivery rate — join purchase_order to
+      supplier, compute the average of ON_TIME_FLAG per supplier, worst first.</span>
+      <div class="show">The assistant writes a <code class="inline">SELECT</code> joining
+      <code class="inline">purchase_order</code> to <code class="inline">supplier</code>, computing
+      <code class="inline">AVG(ON_TIME_FLAG)</code> as the OTD rate, grouping per supplier and ordering ascending.
+      Run it and show the result grid — a read-only <code class="inline">SELECT</code>, nothing persisted.</div>
+      <div class="say">"An analyst who knows the business but not the SAP schema just wrote a correct, two-table
+      join by describing what they wanted. And it's real, editable SQL — nothing hidden."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> into the generated SQL and use the assistant to
+      <span class="ask">explain this query</span> or <span class="ask">also show each supplier's risk score</span>.
+      <div class="show">It <strong>iterates</strong> on the existing query — edit-in-place, not a black box. We stop
+      at the result; we're not saving it. (If a governed team wanted to keep it, this is where they'd promote it to a
+      view or certified function like the ones in section 3 — but that's not part of this demo.)</div>
+      <div class="tip">Tie it back: this is exactly how the demo's certified functions (e.g.
+      <code class="inline">otd_rate_per_supplier</code>) started life — a prompt in the editor, later promoted to a
+      governed, parameterized function that Genie can call.</div>
+    </li>
+  </ol>
+
+  <h3>9c · Explore the same idea with Visual Data Prep (no code)</h3>
+  <p>The third path is fully visual — for users who don't want to write PySpark or SQL at all. Open
+  <strong>Visual Data Prep</strong> (the no-code data-preparation canvas — reachable from the <strong>+ New</strong>
+  menu / Data Ingestion &amp; prep, or the transform canvas in the workspace).</p>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> <strong>+ New</strong> → the <strong>Visual Data Prep</strong> canvas
+      and add a <strong>source</strong> step pointing at
+      <code class="inline">purchasing_demo.supplier_risk</code>.
+      <div class="show">A drag-and-drop transformation canvas — each step is a node (source, join, aggregate, filter,
+      select), with a live data preview after every step. No syntax to learn.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>+ Add step</strong> to <strong>join</strong> in
+      <code class="inline">supplier</code> (on <code class="inline">LIFNR</code>), then add a <strong>filter</strong>
+      step (e.g. <code class="inline">DELIVERY_RISK_FLAG = 'X'</code>) and a <strong>sort</strong> by
+      <code class="inline">RISK_SCORE</code> descending.
+      <div class="show">Each step previews its output immediately, so a business user can <em>see</em> the join and
+      the filter take effect before committing anything — self-service exploration with guardrails.</div>
+      <div class="say">"Same kind of question as the notebook and the SQL editor — the riskiest suppliers — but
+      built by pointing and clicking. And it's reading the exact same governed tables. Three front doors, one
+      foundation."</div>
+    </li>
+    <li><span class="click-label">SHOW</span> the <strong>preview panel</strong> and stop there.
+      <div class="show">We <strong>don't</strong> hit "Create table" — this is a concept demo, so we leave it at the
+      live preview. Point out that <em>if</em> they wanted to, one click would materialize it as a governed UC table
+      with full lineage — but we're intentionally persisting nothing today.</div>
+    </li>
+  </ol>
+  <div class="tip">Depending on your workspace version the no-code prep surface may be labelled <em>Visual Data Prep</em>,
+  a <em>data-prep pipeline</em>, or the Lakeflow visual editor. The message is the same regardless of label: a
+  <strong>no-code path</strong> onto the same governed tables.</div>
+  <div class="tip"><strong>Nothing here is persisted.</strong> 9a ends in <code class="inline">.display()</code>, 9b is a
+  read-only <code class="inline">SELECT</code>, and 9c stops at the preview — all three are safe to run live and safe to
+  re-run. If short on time, demo just <strong>one</strong> of the three and pick the surface that matches your audience
+  (engineer → notebook, analyst → SQL, business → Visual Data Prep).</div>
+
+  <!-- ============================================================ -->
+  <h2 id="dashboard">10 · AI/BI Dashboard — a filter and two charts <span class="clock">3 min</span></h2>
+  <p>Left nav → <strong>Dashboards</strong> → <strong>Create dashboard</strong> (AI/BI). This is a quick build to show
+  that the same governed metric views also power point-and-click <strong>dashboards</strong> — no SQL for the author,
+  and every number matches Genie and the app because it's the same metric definitions underneath.</p>
+  <div class="say">"Chat is great for ad-hoc questions. But teams also want a standing view they check every
+  morning. Let me build a small dashboard in a minute — one filter, two charts — straight on our governed metric
+  views."</div>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> the <strong>Data</strong> tab → add a dataset. Point it at the metric
+      view <code class="inline">mv_delivery_performance</code> (and add
+      <code class="inline">mv_supplier_risk</code> for the second chart).
+      <div class="show">The author picks a <strong>governed metric view</strong>, not a raw table — so measures like
+      <strong>OTD Rate</strong> are already defined once and can't drift. Mention you could also type a natural-language
+      prompt here and let AI/BI draft the dataset.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>Canvas</strong> tab → <strong>Add a filter</strong> widget.
+      Bind it to <strong>Purchasing Org</strong> (from <code class="inline">mv_delivery_performance</code>).
+      <div class="show">The <strong>one filter</strong> — a Purchasing Org dropdown. It's a dashboard-level filter, so
+      it drives every chart on the page at once.</div>
+      <div class="say">"One control at the top. When a category manager picks their purchasing org, the whole page
+      re-scopes to them."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Add visualization</strong> → <strong>Chart 1: OTD trend.</strong>
+      Choose a <strong>line chart</strong>: X = <strong>Receipt Month</strong>, Y = <strong>OTD Rate</strong>.
+      <div class="show">On-time-delivery rate over time. Because <strong>OTD Rate</strong> is a metric-view measure,
+      the chart just references it — the author writes no aggregation SQL.</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Add visualization</strong> → <strong>Chart 2: risk by
+      country.</strong> Choose a <strong>bar chart</strong> on <code class="inline">mv_supplier_risk</code>:
+      X = <strong>Vendor Country</strong>, Y = <strong>Delivery Risk Vendors</strong>.
+      <div class="show">Where the delivery-risk vendors are concentrated. Two charts, one filter, zero hand-written
+      SQL — all on the governed layer.</div>
+      <div class="say">"Now watch the filter tie it together." <span class="click-label">CLICK</span> a value in the
+      Purchasing Org filter and both charts re-scope live.</div>
+    </li>
+    <li><span class="click-label">SHOW</span> (optional) <strong>Publish</strong> in the top-right.
+      <div class="show">Publishing shares a read-only, governed view with the business — same permissions and lineage as
+      everything else. We won't dwell here; the point is how fast a governed dashboard comes together.</div>
+    </li>
+  </ol>
+  <div class="tip">A one-filter, two-chart dashboard is enough to make the point. If a dashboard already exists in the
+  workspace, open it instead of building from scratch — the click path (filter → charts on metric views) is the same.
+  Nothing here needs to be saved for the rest of the demo.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="app">11 · The App — one screen for the business <span class="clock">4 min</span></h2>
   <p>Left nav → <strong>Apps</strong> → open <strong>"sap-purchasing-app."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the <strong>Visualizations</strong> tab.
@@ -344,7 +538,7 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="jobs">9 · Automation — running the pipeline as a Job <span class="clock">2 min</span></h2>
+  <h2 id="jobs">12 · Automation — running the pipeline as a Job <span class="clock">2 min</span></h2>
   <p>Left nav → <strong>Workflows</strong> → <strong>Jobs</strong> → open
   <strong>"sap_purchasing_data_prep."</strong></p>
   <ol class="clicks">
@@ -374,7 +568,7 @@
   <code class="inline">run_now_and_wait</code> cell at the bottom of that notebook.</div>
 
   <!-- ============================================================ -->
-  <h2 id="close">10 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
+  <h2 id="close">13 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
   <div class="say">"To make natural language trustworthy, we grounded it: documented tables with keys,
   KPIs defined once as metric views, business rules as certified functions, and a benchmark that scores
   the agent's answers against known-good SQL — it scored <strong>100%</strong> on our question set."</div>
