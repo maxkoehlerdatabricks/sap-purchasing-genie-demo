@@ -92,7 +92,7 @@ sap-purchasing-genie-demo/
     03b_metric_views.py             # UC metric views
     03c_value_dictionaries.py       # value dictionary
   04_resources/
-    04a_resources.py                # SEPARATE: warehouse + permissions (Python SDK)
+    04a_resources.py                # warehouse + permissions (Python SDK)
   05_genie/
     05a_create_genie_spaces.py      # create 2 Genie spaces + all instruction types
     genie_instructions_space1.md    # instructions (with "use first" recommendations)
@@ -103,7 +103,7 @@ sap-purchasing-genie-demo/
     07a_benchmark.py                # runs 16 questions vs known-good SQL → accuracy score
     benchmark_questions.yaml
   08_jobs/
-    08a_create_jobs.py              # SEPARATE serverless data-prep Job (Python SDK)
+    08a_create_jobs.py              # serverless data-prep Job (Python SDK)
   app/                              # Databricks App (React + FastAPI)
   99_teardown.py                    # DELETE every asset the demo creates (app, job, MAS, Genie, schema)
   demo_script.html                  # comprehensive demo walkthrough
@@ -118,19 +118,14 @@ create Genie spaces + Agent Bricks + serving endpoints + Apps.
 
 1. **Import** this folder into your workspace (Repos/Git folder, or
    `databricks workspace import-dir . /Workspace/Users/<you>/sap-purchasing-genie-demo`).
-2. **Build the data + semantics** — open `00_run_all` on **serverless** compute, set the
-   `catalog` / `schema` / `warehouse_id` widgets **once**, and Run All. This runs the raw
-   simulation → gold Workflows A–E → constraints/comments → SQL functions → metric views →
-   value dictionary.
-3. **Resources** (separate) — run `04_resources/04a_resources` to ensure the warehouse and
-   grant privileges.
-4. **Genie spaces** — run `05_genie/05a_create_genie_spaces`. IDs are saved to `_GENIE_SPACES`.
-5. **MAS** — run `06_agent/06a_create_mas`. It waits for the endpoint to go READY and saves
-   the endpoint name to `_MAS_ENDPOINT`.
-6. **Benchmark** — run `07_benchmark/07a_benchmark` to print the accuracy score.
-7. **Job** (optional) — run `08_jobs/08a_create_jobs` to register the serverless data-prep
-   Job (it just calls `00_run_all`).
-8. **App** — see `app/README.md` for the local devloop and deploy steps.
+2. **Run `00_run_all`** on **serverless** compute — set the `CATALOG` / `SCHEMA` /
+   `WAREHOUSE_ID` Python variables **once** at the top, then Run All. It orchestrates
+   everything in order: raw simulation → gold Workflows A–E → constraints/comments →
+   SQL functions → metric views → value dictionary → warehouse & permissions → 2 Genie
+   spaces → MAS + serving endpoint → benchmark → serverless Job → Databricks App.
+
+Each child notebook can still be run individually (it reads the same parameters), but
+`00_run_all` is the single-command path for a full deployment.
 
 ### Teardown
 Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates —
@@ -164,7 +159,7 @@ the **schema is created**.
 
 ## Verification checklist
 
-- `00_run_all` completes → 5 gold tables populated with PK/FK + comments.
+- `00_run_all` completes → full deployment (data, semantics, Genie, MAS, benchmark, Job, App).
 - All 11 example questions return correct rows via the trusted SQL functions.
 - Both Genie spaces answer sample questions (and call the certified functions).
 - The MAS endpoint routes a question to the correct Genie space.

@@ -1,4 +1,9 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
+# DBTITLE 1,Cell 1
 # MAGIC %md
 # MAGIC # 00_run_all — TOP-LEVEL Orchestrator (parameterize ONCE here)
 # MAGIC
@@ -14,17 +19,15 @@
 # MAGIC 2. `02_build_gold/02a..02e`           — Workflows A–E → 5 gold tables.
 # MAGIC 3. `02_build_gold/02f_constraints_comments` — PK/FK + column/table comments.
 # MAGIC 4. `03_semantics/03a..03c`            — SQL functions, metric views, value dicts.
+# MAGIC 5. `04_resources/04a_resources`       — ensure warehouse + grant UC permissions.
+# MAGIC 6. `05_genie/05a_create_genie_spaces` — create the 2 Genie spaces + instructions.
+# MAGIC 7. `06_agent/06a_create_mas`          — create the Agent Bricks MAS + endpoint.
+# MAGIC 8. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
+# MAGIC 9. `08_jobs/08a_create_jobs`          — register the serverless data-prep Job.
+# MAGIC 10. `app/deploy_app`                   — create & deploy the Databricks App.
 # MAGIC
-# MAGIC ## What it does NOT run (run these manually / separately)
-# MAGIC * `04_resources/04a_resources`  — creates infra (warehouse ensure, permissions).
-# MAGIC * `05_genie/05a_create_genie_spaces` — creates the 2 Genie spaces.
-# MAGIC * `06_agent/06a_create_mas`      — creates the Agent Bricks MAS + endpoint.
-# MAGIC * `07_benchmark/07a_benchmark`   — runs the accuracy benchmark.
-# MAGIC * `08_jobs/08a_create_jobs`      — registers the serverless data-prep Job.
-# MAGIC
-# MAGIC These are deliberately separate because they create *account/workspace-level*
-# MAGIC resources (Genie, endpoints, jobs) rather than just data, and you typically run
-# MAGIC them once, review them in the UI, and re-run selectively.
+# MAGIC ## What it does NOT run
+# MAGIC * `99_teardown` — destructive cleanup (deletes everything). Run manually when needed.
 # MAGIC
 # MAGIC > **Compute:** run this on **Serverless** interactive compute.
 
@@ -121,11 +124,53 @@ run_child("./03_semantics/03c_value_dictionaries")
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 5 — Warehouse & permissions
 # MAGIC %md
-# MAGIC ## Done — data + semantics are ready
-# MAGIC Next, run the separate notebooks (resources, Genie, MAS, benchmark, jobs) and
-# MAGIC deploy the App. See `README.md` for the full sequence.
+# MAGIC ## 5) Ensure warehouse & grant UC permissions
 
 # COMMAND ----------
 
-dbutils.notebook.exit("00_run_all: SUCCESS — 5 gold tables + semantics built.")
+# DBTITLE 1,Run 04a_resources
+run_child("./04_resources/04a_resources")
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 6 — Genie spaces & MAS
+# MAGIC %md
+# MAGIC ## 6) Create the 2 Genie spaces + Agent Bricks MAS
+# MAGIC Genie spaces must exist before the MAS, and the MAS waits for its serving
+# MAGIC endpoint to reach READY (may take a few minutes).
+
+# COMMAND ----------
+
+# DBTITLE 1,Run 05a + 06a
+run_child("./05_genie/05a_create_genie_spaces")  # 2 domain-split Genie spaces
+run_child("./06_agent/06a_create_mas")            # Agent Bricks MAS + serving endpoint
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 7 — Benchmark, Job & App
+# MAGIC %md
+# MAGIC ## 7) Benchmark, serverless Job & App deployment
+# MAGIC Benchmark validates accuracy against known-good SQL (and optionally queries the
+# MAGIC MAS). The Job wraps `00_run_all` for scheduled re-runs. The App is deployed last.
+
+# COMMAND ----------
+
+# DBTITLE 1,Run 07a + 08a + deploy_app
+run_child("./07_benchmark/07a_benchmark")    # accuracy benchmark
+run_child("./08_jobs/08a_create_jobs")       # serverless data-prep Job
+run_child("./app/deploy_app")               # Databricks App (React + FastAPI)
+
+# COMMAND ----------
+
+# DBTITLE 1,Cell 14
+# MAGIC %md
+# MAGIC ## Done — full deployment complete
+# MAGIC All data, semantics, Genie spaces, MAS endpoint, benchmark, Job, and App have
+# MAGIC been deployed. Run `99_teardown` to clean up when you're done.
+
+# COMMAND ----------
+
+# DBTITLE 1,Cell 15
+dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Genie + MAS + benchmark + Job + App).")
