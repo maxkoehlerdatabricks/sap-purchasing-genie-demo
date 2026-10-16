@@ -22,9 +22,10 @@
 # MAGIC 5. `04_resources/04a_resources`       — ensure warehouse + grant UC permissions.
 # MAGIC 6. `05_genie/05a_create_genie_spaces` — create the 2 Genie spaces + instructions.
 # MAGIC 7. `06_agent/06a_create_mas`          — create the Agent Bricks MAS + endpoint.
-# MAGIC 8. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
-# MAGIC 9. `08_jobs/08a_create_jobs`          — register the serverless data-prep Job.
-# MAGIC 10. `app/deploy_app`                   — create & deploy the Databricks App.
+# MAGIC 8. `09_domains/09a_create_domains`    — create Discover domains, subdomains & Pages.
+# MAGIC 9. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
+# MAGIC 10. `08_jobs/08a_create_jobs`          — register the serverless data-prep Job.
+# MAGIC 11. `app/deploy_app`                   — create & deploy the Databricks App.
 # MAGIC
 # MAGIC ## What it does NOT run
 # MAGIC * `99_teardown` — destructive cleanup (deletes everything). Run manually when needed.
@@ -149,9 +150,23 @@ run_child("./06_agent/06a_create_mas")            # Agent Bricks MAS + serving e
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 7 — Discover domains & Pages
+# MAGIC %md
+# MAGIC ## 7) Create Discover domains, subdomains & governed Pages
+# MAGIC Organises gold tables, metric views, functions, and Genie spaces into a
+# MAGIC business-aligned hierarchy on the Discover page. Creates 5 governed Pages
+# MAGIC (business glossary) that Genie One reads as ontology.
+
+# COMMAND ----------
+
+# DBTITLE 1,Run 09a_create_domains
+run_child("./09_domains/09a_create_domains")
+
+# COMMAND ----------
+
 # DBTITLE 1,Step 7 — Benchmark, Job & App
 # MAGIC %md
-# MAGIC ## 7) Benchmark, serverless Job & App deployment
+# MAGIC ## 8) Benchmark, serverless Job & App deployment
 # MAGIC Benchmark validates accuracy against known-good SQL (and optionally queries the
 # MAGIC MAS). The Job wraps `00_run_all` for scheduled re-runs. The App is deployed last.
 
@@ -167,10 +182,11 @@ run_child("./app/deploy_app")               # Databricks App (React + FastAPI)
 # DBTITLE 1,Cell 14
 # MAGIC %md
 # MAGIC ## Done — full deployment complete
-# MAGIC All data, semantics, Genie spaces, MAS endpoint, benchmark, Job, and App have
-# MAGIC been deployed. Run `99_teardown` to clean up when you're done.
+# MAGIC All data, semantics, Genie spaces, MAS endpoint, Discover domains & Pages,
+# MAGIC benchmark, Job, and App have been deployed. Run `99_teardown` to clean up
+# MAGIC when you're done.
 
 # COMMAND ----------
 
 # DBTITLE 1,Cell 15
-dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Genie + MAS + benchmark + Job + App).")
+dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Genie + MAS + domains + benchmark + Job + App).")

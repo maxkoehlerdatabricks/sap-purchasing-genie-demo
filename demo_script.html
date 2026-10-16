@@ -46,6 +46,7 @@
     supply-continuity questions in plain English — without SAP access.</p>
     <div>
       <span class="pill">Genie One</span>
+      <span class="pill">Discover &amp; Domains</span>
       <span class="pill">Catalog Explorer</span>
       <span class="pill">Genie ×2</span>
       <span class="pill">Notebook + Genie assistant</span>
@@ -62,12 +63,13 @@
 
   <p class="lead" style="margin-top:26px;">This script is a <strong>click-through of the Databricks
   UI</strong>. Each step says exactly where to click, what to say, and what to point out. Total run
-  time ~41 minutes. You can stop after any section.</p>
+  time ~45 minutes. You can stop after any section.</p>
 
-  <h2 id="toc">Flow <span class="clock">~41 min</span></h2>
+  <h2 id="toc">Flow <span class="clock">~45 min</span></h2>
   <ol class="toc">
-    <li><a href="#genie-one">Genie One — ask in plain English before anything else (3 min)</a></li>
+    <li><a href="#genie-one">Genie One — ask in plain English before anything else (4 min)</a></li>
     <li><a href="#hook">The hook — a $2M question (1 min)</a></li>
+    <li><a href="#discover">Discover — domains, subdomains &amp; business glossary (3 min)</a></li>
     <li><a href="#catalog">Catalog Explorer — the governed data model (4 min)</a></li>
     <li><a href="#genie1">Genie: Sourcing &amp; Supplier Risk (5 min)</a></li>
     <li><a href="#genie2">Genie: Purchase Order Analytics (3 min)</a></li>
@@ -82,7 +84,7 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="genie-one">1 · Genie One — ask in plain English before anything else <span class="clock">3 min</span></h2>
+  <h2 id="genie-one">1 · Genie One — ask in plain English before anything else <span class="clock">4 min</span></h2>
   <p>Open Genie from the <strong>left nav → Genie</strong> (the single, unified entry). This is the very first
   thing the audience sees — no data model, no SQL, no setup. Just a question box over the governed data.</p>
   <div class="say">"Before I show you a single table, let me show you the end state. This is Genie — one place in
@@ -104,15 +106,34 @@
       <div class="say">"That's the $2M question — answered in seconds, by anyone, without waiting on a specialist.
       Now let me peel back the layers and show you why you can trust this answer."</div>
     </li>
+    <li><span class="click-label">TYPE</span> a definition question to prove Genie knows the official terminology:
+      <span class="ask">How do we define delivery risk?</span>
+      <div class="show">Genie responds with the <strong>governed Page definition</strong> — delivery risk is time-sliced
+      (DELIVERY_RISK_FLAG='X' within VALID_FROM..VALID_TO), with risk categories and a numeric score.
+      This came from the <strong>Delivery Risk</strong> Page in the Discover glossary, not the LLM's training data.</div>
+      <div class="say">"I didn't just get data — I got the official definition. That came from a governed
+      business glossary Page, not a guess. The definition and the query that uses it are governed together."</div>
+    </li>
     <li><span class="click-label">TYPE</span> one quick follow-up to prove it's conversational:
       <span class="ask">Which plants are affected?</span>
       <div class="show">Genie keeps the context from the previous question and narrows the same result set — no
       re-stating the whole question.</div>
     </li>
+    <li><span class="click-label">TYPE</span> a second definition question:
+      <span class="ask">What does multi-sourcing mean in our context?</span>
+      <div class="show">Genie cites the <strong>Multi-Sourcing Strategy</strong> Page: ≥2 valid, non-blocked vendors
+      per material+plant. Point out that this is the <em>exact same threshold</em> the certified function
+      <code class="inline">materials_without_multisourcing(2)</code> uses — one definition, everywhere.</div>
+      <div class="say">"The business owns these definitions as governed Pages. Genie reads them, dashboards
+      reference them, and the certified functions implement them. No drift."</div>
+    </li>
   </ol>
   <div class="tip">This is deliberately the <strong>same flagship question</strong> we return to in the scoped Genie
-  space (section 4) and the App (section 11). Showing it here first sets the "so what," and every later section
-  answers "why should I believe it?" — governance, agents, observability, and how the data was built.</div>
+  space (section 5) and the App (section 12). Showing it here first sets the "so what," and every later section
+  answers "why should I believe it?" — governance, domains, agents, observability, and how the data was built.</div>
+  <div class="tip">The definition questions (steps 3 and 5) demonstrate that Genie One reads the <strong>governed
+  Pages</strong> from the Discover glossary. In section 3 we'll show where those Pages live — inside the domains
+  and subdomains on the Discover page.</div>
   <div class="tip"><strong>Pre-warm:</strong> ask this question once before the demo so the warehouse is hot and the
   first live answer returns instantly.</div>
 
@@ -126,7 +147,59 @@
   dependency on SAP experts for everyday sourcing-risk questions.</div>
 
   <!-- ============================================================ -->
-  <h2 id="catalog">3 · Catalog Explorer — the governed data model <span class="clock">4 min</span></h2>
+  <h2 id="discover">3 · Discover — domains, subdomains &amp; business glossary <span class="clock">3 min</span></h2>
+  <p>Left nav → <strong>Discover</strong>. This is the business-organised entry point to the governed data.</p>
+  <div class="say">"Before I show you the catalog, let me show you how the business finds data. This isn't
+  organised by catalog path — it's organised by <strong>business domain</strong>."</div>
+  <ol class="clicks">
+    <li><span class="click-label">SHOW</span> the <strong>Discover landing page</strong> with the
+      <strong>SAP Purchasing</strong> domain card.
+      <div class="show">The domain card shows a short subtitle, an icon, and the number of curated assets.
+      Point out that this is a <strong>governed tag</strong> underneath — the same primitive that drives
+      ABAC policies, so domain membership and access control share the same mechanism.</div>
+      <div class="say">"A purchasing analyst doesn't need to know <code class="inline">serverless_stable_7qzrfp_catalog.purchasing_demo</code>
+      — they click 'SAP Purchasing' and see everything relevant to them."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>SAP Purchasing</strong> domain card.
+      <div class="show">The domain page with <strong>two subdomain cards</strong>: "Sourcing &amp; Supplier Risk"
+      and "Purchase Order Analytics." Below them, the <strong>curated sections</strong> — shared assets
+      (MATERIAL, SUPPLIER, VALUE_DICTIONARY), the two Genie spaces, and the App.</div>
+      <div class="say">"Two subdomains mirror the two Genie spaces we'll demo later. The shared tables
+      (material, supplier, value dictionary) sit at the parent level because both subdomains use them."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>Sourcing &amp; Supplier Risk</strong> subdomain card.
+      <div class="show">The subdomain page with its own curated sections: the SOURCING and SUPPLIER_RISK tables,
+      the two metric views (sourcing coverage, supplier risk), and the certified SQL functions — all
+      grouped and described in business language.</div>
+      <div class="say">"This is a curated landing page, not a folder. The data team decides what's featured,
+      in what order, with descriptions. A category manager sees exactly what's relevant to sourcing risk."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Pages</strong> (in the domain or from the top nav) →
+      open the <strong>"Multi-Sourcing Strategy"</strong> Page.
+      <div class="show">A structured definition: what multi-sourcing means (≥2 valid vendors), why it matters
+      (concentration risk), the threshold (2), and links to the metric view and certified function that
+      implement it.</div>
+      <div class="say">"Remember when Genie answered 'what does multi-sourcing mean'? This is where that
+      answer came from — a governed Page, authored by the data team, not the LLM's training data.
+      One definition, used everywhere: Genie, dashboards, the app."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <strong>"Delivery Risk"</strong> Page.
+      <div class="show">The time-sliced risk model: DELIVERY_RISK_FLAG='X' within VALID_FROM..VALID_TO,
+      risk categories (financial, quality, geopolitical, logistics), and the numeric RISK_SCORE.
+      Point out this is the same rule the <code class="inline">single_sourced_risky</code> function
+      implements — the definition and the code are governed together.</div>
+    </li>
+  </ol>
+  <div class="say">"Five pages, five definitions — covering multi-sourcing, delivery risk, OTD, quota
+  arrangements, and the SAP code glossary. Each one tells Genie what a term means, the metric views
+  tell it how to calculate, and the certified functions handle the complex joins. No redundancy,
+  one source of truth per layer."</div>
+  <div class="tip"><strong>Transition:</strong> "Now let me show you the technical view of the same data —
+  the catalog, with its documented columns, primary keys, and lineage." This frames section 4 as a
+  complementary, technical lens on the data the business just browsed by domain.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="catalog">4 · Catalog Explorer — the governed data model <span class="clock">4 min</span></h2>
   <p>Start in the Databricks UI left nav → <strong>Catalog</strong>.</p>
   <ol class="clicks">
     <li><span class="click-label">CLICK</span> Catalog → <code class="inline">serverless_stable_7qzrfp_catalog</code>
@@ -202,7 +275,7 @@
   keys, certified functions, and consistent metrics — the foundation that makes the AI layer trustworthy.</div>
 
   <!-- ============================================================ -->
-  <h2 id="genie1">4 · Genie: Sourcing &amp; Supplier Risk <span class="clock">5 min</span></h2>
+  <h2 id="genie1">5 · Genie: Sourcing &amp; Supplier Risk <span class="clock">5 min</span></h2>
   <p>Left nav → <strong>Genie</strong> → open <strong>"SAP Purchasing — Sourcing &amp; Supplier Risk."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the space landing page.
@@ -238,7 +311,7 @@
   and the certified functions attached.</div>
 
   <!-- ============================================================ -->
-  <h2 id="genie2">5 · Genie: Purchase Order Analytics <span class="clock">3 min</span></h2>
+  <h2 id="genie2">6 · Genie: Purchase Order Analytics <span class="clock">3 min</span></h2>
   <p>Open the second space — <strong>"SAP Purchasing — Purchase Order Analytics."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">TYPE</span> <span class="ask">What is the on-time delivery rate per
@@ -258,7 +331,7 @@
   pick the right space — so we put a supervisor in front."</div>
 
   <!-- ============================================================ -->
-  <h2 id="mas">6 · Agent Bricks — the Multi-Agent Supervisor <span class="clock">3 min</span></h2>
+  <h2 id="mas">7 · Agent Bricks — the Multi-Agent Supervisor <span class="clock">3 min</span></h2>
   <p>Left nav → <strong>Agents</strong> (Agent Bricks) → open <strong>"sap_purchasing_supervisor."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the supervisor's config.
@@ -279,7 +352,7 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="agents">7 · Under the hood — Agents, the Supervisor, provisioning &amp; auth <span class="clock">3 min</span></h2>
+  <h2 id="agents">8 · Under the hood — Agents, the Supervisor, provisioning &amp; auth <span class="clock">3 min</span></h2>
   <p>This section is for the technical audience — it explains <em>what</em> we just demoed and <em>how</em> it
   is wired. Stay in the <strong>Agents</strong> area; refer back to the notebooks as needed.</p>
 
@@ -362,7 +435,7 @@
   <code class="inline">app/backend/main.py</code>.</div>
 
   <!-- ============================================================ -->
-  <h2 id="dataprep">9 · Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep <span class="clock">8 min</span></h2>
+  <h2 id="dataprep">10 · Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep <span class="clock">8 min</span></h2>
   <p>Everything so far ran on the governed <strong>gold tables</strong>. This section shows that the people who
   <em>author</em> against those tables get the same AI assistance the business gets — three ways in: a notebook, the
   SQL editor, and a no-code canvas. These are <strong>quick concept demos</strong>, not a build step: each one is a
@@ -372,7 +445,7 @@
   building these datasets get the same AI assistance — whether they live in a notebook, the SQL editor, or a
   no-code canvas. I'll keep these small — just enough to show the idea, nothing saved."</div>
 
-  <h3>9a · Prepare a dataset in a notebook with the Assistant</h3>
+  <h3>10a · Prepare a dataset in a notebook with the Assistant</h3>
   <p>Left nav → <strong>Workspace</strong> → open a new (or scratch) <strong>notebook</strong> on serverless.</p>
   <ol class="clicks">
     <li><span class="click-label">CLICK</span> the <strong>Assistant</strong> icon in the notebook (the sparkle in
@@ -402,7 +475,7 @@
     </li>
   </ol>
 
-  <h3>9b · Write SQL from a prompt with the SQL editor's AI assistant</h3>
+  <h3>10b · Write SQL from a prompt with the SQL editor's AI assistant</h3>
   <p>Left nav → <strong>SQL Editor</strong>. Pick the warehouse <code class="inline">Serverless Starter Warehouse</code>
   and set the catalog/schema to <code class="inline">serverless_stable_7qzrfp_catalog</code> /
   <code class="inline">purchasing_demo</code>.</p>
@@ -433,7 +506,7 @@
     </li>
   </ol>
 
-  <h3>9c · Explore the same idea with Visual Data Prep (no code)</h3>
+  <h3>10c · Explore the same idea with Visual Data Prep (no code)</h3>
   <p>The third path is fully visual — for users who don't want to write PySpark or SQL at all. Open
   <strong>Visual Data Prep</strong> (the no-code data-preparation canvas — reachable from the <strong>+ New</strong>
   menu / Data Ingestion &amp; prep, or the transform canvas in the workspace).</p>
@@ -463,13 +536,13 @@
   <div class="tip">Depending on your workspace version the no-code prep surface may be labelled <em>Visual Data Prep</em>,
   a <em>data-prep pipeline</em>, or the Lakeflow visual editor. The message is the same regardless of label: a
   <strong>no-code path</strong> onto the same governed tables.</div>
-  <div class="tip"><strong>Nothing here is persisted.</strong> 9a ends in <code class="inline">.display()</code>, 9b is a
-  read-only <code class="inline">SELECT</code>, and 9c stops at the preview — all three are safe to run live and safe to
+  <div class="tip"><strong>Nothing here is persisted.</strong> 10a ends in <code class="inline">.display()</code>, 10b is a
+  read-only <code class="inline">SELECT</code>, and 10c stops at the preview — all three are safe to run live and safe to
   re-run. If short on time, demo just <strong>one</strong> of the three and pick the surface that matches your audience
   (engineer → notebook, analyst → SQL, business → Visual Data Prep).</div>
 
   <!-- ============================================================ -->
-  <h2 id="dashboard">10 · AI/BI Dashboard — a filter and two charts <span class="clock">3 min</span></h2>
+  <h2 id="dashboard">11 · AI/BI Dashboard — a filter and two charts <span class="clock">3 min</span></h2>
   <p>Left nav → <strong>Dashboards</strong> → <strong>Create dashboard</strong> (AI/BI). This is a quick build to show
   that the same governed metric views also power point-and-click <strong>dashboards</strong> — no SQL for the author,
   and every number matches Genie and the app because it's the same metric definitions underneath.</p>
@@ -514,7 +587,7 @@
   Nothing here needs to be saved for the rest of the demo.</div>
 
   <!-- ============================================================ -->
-  <h2 id="app">11 · The App — one screen for the business <span class="clock">4 min</span></h2>
+  <h2 id="app">12 · The App — one screen for the business <span class="clock">4 min</span></h2>
   <p>Left nav → <strong>Apps</strong> → open <strong>"sap-purchasing-app."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the <strong>Visualizations</strong> tab.
@@ -538,7 +611,7 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="jobs">12 · Automation — running the pipeline as a Job <span class="clock">2 min</span></h2>
+  <h2 id="jobs">13 · Automation — running the pipeline as a Job <span class="clock">2 min</span></h2>
   <p>Left nav → <strong>Workflows</strong> → <strong>Jobs</strong> → open
   <strong>"sap_purchasing_data_prep."</strong></p>
   <ol class="clicks">
@@ -568,8 +641,9 @@
   <code class="inline">run_now_and_wait</code> cell at the bottom of that notebook.</div>
 
   <!-- ============================================================ -->
-  <h2 id="close">13 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
-  <div class="say">"To make natural language trustworthy, we grounded it: documented tables with keys,
+  <h2 id="close">14 · Close — trust &amp; what it took <span class="clock">1 min</span></h2>
+  <div class="say">"To make natural language trustworthy, we grounded it: business domains on the Discover page,
+  governed Pages defining every key term, documented tables with keys,
   KPIs defined once as metric views, business rules as certified functions, and a benchmark that scores
   the agent's answers against known-good SQL — it scored <strong>100%</strong> on our question set."</div>
   <div class="show">The whole thing is a set of <strong>manually-runnable notebooks</strong>, parameterized
@@ -598,11 +672,15 @@
   <div class="setup">
     Ensure these have been run (once): <code class="inline">00_run_all</code> (data + semantics) →
     <code class="inline">04a_resources</code> → <code class="inline">05a_create_genie_spaces</code> →
-    <code class="inline">06a_create_mas</code> → <code class="inline">07a_benchmark</code> →
+    <code class="inline">06a_create_mas</code> →
+    <code class="inline">09a_create_domains</code> (domains, subdomains &amp; Pages) →
+    <code class="inline">07a_benchmark</code> →
     <code class="inline">08a_create_jobs</code> (the data-prep Job) → deploy the app
-    (<code class="inline">app/deploy_app</code>). Open both Genie spaces, the supervisor, the job, and the app
-    in separate browser tabs before you start so switching is instant. Warm the SQL warehouse with one query
-    so the first Genie answer isn't waiting on a cold start.
+    (<code class="inline">app/deploy_app</code>). Verify the <strong>Discover</strong> page shows the
+    SAP Purchasing domain with both subdomains published. Open both Genie spaces, the supervisor,
+    the Discover page, the job, and the app in separate browser tabs before you start so switching
+    is instant. Warm the SQL warehouse with one query so the first Genie answer isn't waiting on
+    a cold start.
   </div>
 
 </div>
