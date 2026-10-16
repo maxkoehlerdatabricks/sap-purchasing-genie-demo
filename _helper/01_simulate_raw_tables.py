@@ -1,4 +1,8 @@
 # Databricks notebook source
+# /// script
+# [tool.databricks.environment]
+# environment_version = "6"
+# ///
 # MAGIC %md
 # MAGIC # _helper/01_simulate_raw_tables — Simulate all 13 RAW_* SAP tables
 # MAGIC

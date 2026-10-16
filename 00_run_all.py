@@ -15,6 +15,7 @@
 # MAGIC point of control — driven by Python assignments, not inline widget-dict literals.
 # MAGIC
 # MAGIC ## What it runs (in order)
+# MAGIC 0. `_helper/00_preflight_checks`        — validate catalog perms, warehouse, governed tags.
 # MAGIC 1. `_helper/01_simulate_raw_tables`   — generate the 13 RAW_* tables.
 # MAGIC 2. `02_build_gold/02a..02e`           — Workflows A–E → 5 gold tables.
 # MAGIC 3. `02_build_gold/02f_constraints_comments` — PK/FK + column/table comments.
@@ -43,9 +44,9 @@
 # COMMAND ----------
 
 # ---- The single source of truth for the whole pipeline (Python "X = ..." style) ----
-CATALOG = "serverless_stable_7qzrfp_catalog"   # Unity Catalog (existing, taken as-is)
+CATALOG = "classic_stable_3n1juw_catalog"   # Unity Catalog (existing, taken as-is)
 SCHEMA = "purchasing_demo"                       # Schema (created by the demo)
-WAREHOUSE_ID = "117d425266741646"               # Serverless SQL Warehouse ID
+WAREHOUSE_ID = "db9813035505e7b0"               # Serverless SQL Warehouse ID
 
 print(f"Orchestrating with: catalog={CATALOG}  schema={SCHEMA}  warehouse_id={WAREHOUSE_ID}")
 
@@ -79,6 +80,32 @@ def run_child(path: str, catalog: str = CATALOG, schema: str = SCHEMA,
     print(f"✓ Finished: {path}  ({dt:,.1f}s)  → {result}")
     return result
 
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 0 — Preflight checks
+# MAGIC %md
+# MAGIC ## 0) Preflight checks
+# MAGIC Validate catalog permissions, SQL warehouse usability, and governed-tag support
+# MAGIC before running the pipeline. Fails fast with a clear message if anything is wrong.
+
+# COMMAND ----------
+
+# DBTITLE 1,Run preflight checks
+result = run_child("./_helper/00_preflight_checks")
+
+print(f"\n{'=' * 70}")
+print("  PREFLIGHT REPORT")
+print(f"{'=' * 70}")
+print(result)
+print(f"{'=' * 70}")
+
+if "FAILED" in result:
+    print("\n❌ Pipeline halted. Fix the issues above, then re-run this cell.")
+    print("   Open _helper/00_preflight_checks for the full diagnostic output.")
+    raise RuntimeError(result.splitlines()[0])
+else:
+    print("\n✅ All clear — proceeding with pipeline.")
 
 # COMMAND ----------
 
