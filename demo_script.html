@@ -67,7 +67,8 @@
 
   <h2 id="toc">Flow <span class="clock">~45 min</span></h2>
   <ol class="toc">
-    <li><a href="#genie-one">Genie One — ask in plain English before anything else (4 min)</a></li>
+    <li><a href="#warmup">Pre-demo warm-up — seed Genie Ontology (day before)</a></li>
+    <li><a href="#genie-one">Genie One — ask in plain English before anything else (6 min)</a></li>
     <li><a href="#hook">The hook — a $2M question (1 min)</a></li>
     <li><a href="#discover">Discover — domains, subdomains &amp; business glossary (3 min)</a></li>
     <li><a href="#catalog">Catalog Explorer — the governed data model (4 min)</a></li>
@@ -84,7 +85,61 @@
   </ol>
 
   <!-- ============================================================ -->
-  <h2 id="genie-one">1 · Genie One — ask in plain English before anything else <span class="clock">4 min</span></h2>
+  <h2 id="warmup">0 · Pre-demo warm-up — seed Genie Ontology <span class="clock">day before</span></h2>
+  <p><strong>Genie Ontology</strong> automatically extracts <strong>inferred context</strong> — snippets about
+  metric definitions, join logic, filter rules, and authoritative sources — from your workspace assets
+  (metric views, dashboards, SQL queries, and Genie Agents). Each snippet gets an <strong>authority score</strong>
+  based on source type, usage frequency, and freshness. A freshly provisioned demo has no usage history, so the
+  ontology starts empty. Run these steps <strong>at least 24 hours before</strong> the live demo to seed it.</p>
+
+  <ol class="clicks">
+    <li><span class="click-label">RUN</span> the full setup: execute <code class="inline">00_run_all</code>
+      to create all tables, functions, metric views, Genie Agents, and the MAS.
+      <div class="tip">Skip if you've already run setup and the schema is populated.</div>
+    </li>
+    <li><span class="click-label">INTERACT</span> with <strong>Genie Agent 1</strong> — "Sourcing &amp; Supplier Risk."
+      Ask 3–4 questions:
+      <ul>
+        <li><em>Which materials have no multi-sourcing strategy?</em></li>
+        <li><em>Show me suppliers with a delivery-risk flag.</em></li>
+        <li><em>Which materials are single-sourced and risky?</em></li>
+      </ul>
+      <strong>Thumbs-up</strong> every correct answer and <strong>download</strong> at least one result set.
+      These interactions generate the usage signals that boost snippet authority scores.
+    </li>
+    <li><span class="click-label">INTERACT</span> with <strong>Genie Agent 2</strong> — "Purchase Order Analytics."
+      Ask 2–3 questions:
+      <ul>
+        <li><em>What is the on-time delivery rate per supplier?</em></li>
+        <li><em>Which POs were placed with suppliers under active delivery risk?</em></li>
+      </ul>
+      <strong>Thumbs-up</strong> correct answers and <strong>download</strong> results.
+    </li>
+    <li><span class="click-label">BROWSE</span> Catalog Explorer →
+      <code class="inline">max_kohler_demo_catalog.purchasing_demo</code>. Open each of the
+      <strong>4 metric views</strong>
+      (<code class="inline">mv_sourcing_coverage</code>,
+      <code class="inline">mv_supplier_risk</code>,
+      <code class="inline">mv_delivery_performance</code>,
+      <code class="inline">mv_price_analytics</code>)
+      and preview their sample data. This registers asset views that feed the ontology.
+    </li>
+    <li><span class="click-label">WAIT</span> at least <strong>24 hours</strong>. Genie Ontology crawls
+      asynchronously — give it time to extract and score snippets from the assets and interactions above.
+    </li>
+    <li><span class="click-label">VERIFY</span> Open <strong>Genie One</strong> (left nav → Genie) and ask:
+      <span class="ask">What is the on-time delivery rate per supplier over the last 12 months?</span>
+      After the answer loads, click the <strong>citation icons</strong> in the response. Look for at least
+      one <strong>inferred source</strong> — e.g. a snippet extracted from
+      <code class="inline">mv_delivery_performance</code> or from the Purchase Order Analytics Genie Agent.
+      If no inferred sources appear, repeat steps 2–4 and wait another day.
+    </li>
+  </ol>
+  <div class="tip">The warm-up also ensures the <strong>SQL warehouse is hot</strong>, so the first live
+  answer in section 1 returns instantly.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="genie-one">1 · Genie One — ask in plain English before anything else <span class="clock">6 min</span></h2>
   <p>Open Genie from the <strong>left nav → Genie</strong> (the single, unified entry). This is the very first
   thing the audience sees — no data model, no SQL, no setup. Just a question box over the governed data.</p>
   <div class="say">"Before I show you a single table, let me show you the end state. This is Genie — one place in
@@ -127,15 +182,34 @@
       <div class="say">"The business owns these definitions as governed Pages. Genie reads them, dashboards
       reference them, and the certified functions implement them. No drift."</div>
     </li>
+    <li><span class="click-label">TYPE</span> a question that surfaces <strong>inferred context</strong>
+      from the ontology:
+      <span class="ask">What is the on-time delivery rate per supplier over the last 12 months?</span>
+      <div class="show">After the answer loads, click the <strong>citation icons</strong> in the response.
+      Point out the <strong>inferred sources</strong> — snippets Genie Ontology automatically extracted from
+      the metric view <code class="inline">mv_delivery_performance</code> or the Purchase Order Analytics
+      Genie Agent. These are <em>not</em> hand-written instructions — the ontology learned them from your
+      governed assets.</div>
+      <div class="say">"Notice the citation. Genie didn't just use the table schema — it found an
+      inferred snippet that tells it how on-time delivery is calculated: goods-receipt date on or before
+      requested date, excluding orders not yet received. That context was automatically extracted from the
+      metric view — no manual prompt engineering."</div>
+    </li>
+    <li><span class="click-label">TYPE</span> a second ontology question to reinforce the point:
+      <span class="ask">Which suppliers have the highest risk scores right now?</span>
+      <div class="show">Click the <strong>citation icons</strong> again. This time the inferred context
+      likely comes from <code class="inline">mv_supplier_risk</code> or the Sourcing &amp; Supplier Risk
+      Genie Agent — a different source, same mechanism.</div>
+      <div class="say">"Two questions, two different inferred sources — both discovered automatically.
+      The ontology builds itself from your governed assets: metric views, certified functions, Genie Agents.
+      The more you curate, the smarter it gets."</div>
+    </li>
   </ol>
-  <div class="tip">This is deliberately the <strong>same flagship question</strong> we return to in the scoped Genie
-  space (section 5) and the App (section 12). Showing it here first sets the "so what," and every later section
-  answers "why should I believe it?" — governance, domains, agents, observability, and how the data was built.</div>
-  <div class="tip">The definition questions (steps 3 and 5) demonstrate that Genie One reads the <strong>governed
-  Pages</strong> from the Discover glossary. In section 3 we'll show where those Pages live — inside the domains
-  and subdomains on the Discover page.</div>
-  <div class="tip"><strong>Pre-warm:</strong> ask this question once before the demo so the warehouse is hot and the
-  first live answer returns instantly.</div>
+  <div class="tip">Steps 1–2 set the "so what" with the flagship question; steps 3 and 5 showcase
+  <strong>governed Pages</strong> (curated definitions); steps 6–7 showcase <strong>inferred context</strong>
+  (snippets Genie Ontology extracted automatically from metric views and Genie Agents). Together they demonstrate
+  both halves of the ontology: what you curate explicitly, and what the system learns from your assets and usage.
+  Sections 5 &amp; 6 will later show the scoped Genie Agent instructions in detail.</div>
 
   <!-- ============================================================ -->
   <h2 id="hook">2 · The hook — a $2M question <span class="clock">1 min</span></h2>
@@ -157,7 +231,7 @@
       <div class="show">The domain card shows a short subtitle, an icon, and the number of curated assets.
       Point out that this is a <strong>governed tag</strong> underneath — the same primitive that drives
       ABAC policies, so domain membership and access control share the same mechanism.</div>
-      <div class="say">"A purchasing analyst doesn't need to know <code class="inline">serverless_stable_7qzrfp_catalog.purchasing_demo</code>
+      <div class="say">"A purchasing analyst doesn't need to know <code class="inline">max_kohler_demo_catalog.purchasing_demo</code>
       — they click 'SAP Purchasing' and see everything relevant to them."</div>
     </li>
     <li><span class="click-label">CLICK</span> the <strong>SAP Purchasing</strong> domain card.
@@ -202,7 +276,7 @@
   <h2 id="catalog">4 · Catalog Explorer — the governed data model <span class="clock">4 min</span></h2>
   <p>Start in the Databricks UI left nav → <strong>Catalog</strong>.</p>
   <ol class="clicks">
-    <li><span class="click-label">CLICK</span> Catalog → <code class="inline">serverless_stable_7qzrfp_catalog</code>
+    <li><span class="click-label">CLICK</span> Catalog → <code class="inline">max_kohler_demo_catalog</code>
       → <code class="inline">purchasing_demo</code>. Show the list of tables.
       <div class="say">"We simulated a realistic SAP purchasing landscape — 13 raw SAP tables — and
       consolidated them into 5 clean, analysis-ready 'gold' tables."</div>
@@ -291,6 +365,22 @@
       <div class="say">"Notice it didn't guess. It used the trusted, governed definition of multi-sourcing
       we saw in the catalog. That's the difference between a demo and something you'd trust in production."</div>
     </li>
+    <li><span class="click-label">TYPE</span> a vendor-count question that showcases an <strong>ontology snippet</strong>:
+      <span class="ask">How many vendors supply each material?</span>
+      <div class="show">Expand <strong>"Show generated code"</strong> — the SQL includes
+      <code class="inline">WHERE IS_VALID_SOURCE = true</code>. Without the ontology snippet, Genie might
+      count <em>all</em> vendors (including blocked ones) and give a dangerously optimistic picture.</div>
+      <div class="show">Now open the <strong>Instructions panel</strong> (gear icon → Instructions) and find
+      the text instruction: <em>"'Valid, non-blocked vendor' means a row in SOURCING where
+      IS_VALID_SOURCE = true."</em> This is an <strong>ontology snippet</strong>.</div>
+      <div class="say">"Pages tell Genie what a term <em>means</em>. Ontology snippets tell Genie
+      <em>how to write the SQL</em> — this one says 'when counting vendors, only count valid ones.'
+      That single rule is the difference between a safe answer and a misleading one."</div>
+      <div class="tip">While the Instructions panel is open, briefly walk the <strong>four instruction
+      types</strong>: general text rules → join/relationship hints → SQL example queries → certified
+      functions. Each layer narrows the space of wrong answers. This is a good time to scroll through
+      them — 30 seconds, big payoff.</div>
+    </li>
     <li><span class="click-label">TYPE</span> the flagship question:
       <span class="ask">Which materials are single-sourced and their sole supplier has a delivery-risk flag?</span>
       <div class="show">The result — the highest-priority supply-continuity risks, with a risk score per material.</div>
@@ -317,6 +407,16 @@
     <li><span class="click-label">TYPE</span> <span class="ask">What is the on-time delivery rate per
       supplier over the last 12 months?</span>
       <div class="show">Again, "Show generated code" reveals it called <code class="inline">otd_rate_per_supplier(12)</code>.</div>
+    </li>
+    <li><span class="click-label">TYPE</span> a scoped OTD question that showcases another <strong>ontology snippet</strong>:
+      <span class="ask">What is the OTD rate this quarter?</span>
+      <div class="show">Expand <strong>"Show generated code"</strong> — the SQL includes
+      <code class="inline">WHERE GR_DATE IS NOT NULL</code>, excluding PO lines that haven't been received
+      yet. Without the snippet, Genie might include those NULL lines and artificially deflate the OTD rate.</div>
+      <div class="say">"An ontology snippet told Genie that a NULL goods-receipt date means 'not yet received'
+      and to exclude it. Without that, every pending PO drags the rate down — a subtle but material error.
+      This is the kind of domain rule that only someone who knows the process would write — and the snippet
+      captures it once for everyone."</div>
     </li>
     <li><span class="click-label">TYPE</span> <span class="ask">Which materials had purchase orders placed
       with a supplier despite an active delivery-risk flag at order date?</span>
@@ -371,7 +471,7 @@
   sub-agents: it <strong>routes each request</strong> to the right one and <strong>synthesizes</strong> the
   answer. Here it supervises the two Genie spaces (<strong>PO Analytics</strong> vs
   <strong>Sourcing &amp; Supplier Risk</strong>), deployed as a single endpoint
-  (<code class="inline">mas-655dcd32-endpoint</code>). It speaks the <strong>Responses API</strong>
+  (<code class="inline">sap-purchasing-mas</code>). It speaks the <strong>Responses API</strong>
   (<code class="inline">{"input":[{"role":"user","content":"…"}]}</code>) and emits a
   <code class="inline">function_call</code> naming the routed sub-agent — which the App parses to show the
   "routed to …" badge.</div>
@@ -413,7 +513,7 @@
   <strong>token usage</strong>. Great for demonstrating governance and observability.</div>
   <ol class="clicks">
     <li><span class="click-label">CLICK</span> <strong>Path 1 — Serving endpoint (primary):</strong>
-      Machine Learning → <strong>Serving</strong> → open <code class="inline">mas-655dcd32-endpoint</code> →
+      Machine Learning → <strong>Serving</strong> → open <code class="inline">sap-purchasing-mas</code> →
       the <strong>Traces</strong> tab (a.k.a. inference logs / monitoring).
       <div class="show">Each row is one invocation; expand it to see the routing, the generated SQL, the spans,
       latency and tokens. Best for answering "why did it route here / what SQL ran?"</div>
@@ -426,7 +526,7 @@
     </li>
     <li><span class="click-label">CLICK</span> <strong>Path 3 — Complementary:</strong> the exact SQL Genie ran
       also appears in <strong>Query History</strong> for warehouse
-      <code class="inline">117d425266741646</code>.
+      <code class="inline">d7a3d1cfbba73c0a</code>.
     </li>
   </ol>
   <div class="tip"><strong>Demo tip:</strong> after asking the MAS a question in the App chat, switch to
@@ -455,7 +555,7 @@
       real column names, not guesses.</div>
     </li>
     <li><span class="click-label">TYPE</span> a small plain-English prompt into the Assistant:
-      <span class="ask">Read supplier and supplier_risk from serverless_stable_7qzrfp_catalog.purchasing_demo,
+      <span class="ask">Read supplier and supplier_risk from max_kohler_demo_catalog.purchasing_demo,
       join on LIFNR, and show the 10 suppliers with the highest risk score — name, country, risk category, risk
       score. Just display it, don't save anything.</span>
       <div class="show">The Assistant generates a <strong>PySpark cell</strong> — reading
@@ -476,8 +576,8 @@
   </ol>
 
   <h3>10b · Write SQL from a prompt with the SQL editor's AI assistant</h3>
-  <p>Left nav → <strong>SQL Editor</strong>. Pick the warehouse <code class="inline">Serverless Starter Warehouse</code>
-  and set the catalog/schema to <code class="inline">serverless_stable_7qzrfp_catalog</code> /
+  <p>Left nav → <strong>SQL Editor</strong>. Pick the warehouse <code class="inline">Serverless SQL Warehouse</code>
+  and set the catalog/schema to <code class="inline">max_kohler_demo_catalog</code> /
   <code class="inline">purchasing_demo</code>.</p>
   <ol class="clicks">
     <li><span class="click-label">CLICK</span> the <strong>Assistant</strong> (sparkle) in the SQL editor, or type
@@ -612,7 +712,7 @@
 
   <!-- ============================================================ -->
   <h2 id="jobs">13 · Automation — running the pipeline as a Job <span class="clock">2 min</span></h2>
-  <p>Left nav → <strong>Workflows</strong> → <strong>Jobs</strong> → open
+  <p>Left nav → <strong>Jobs</strong> → open
   <strong>"sap_purchasing_data_prep."</strong></p>
   <ol class="clicks">
     <li><span class="click-label">SHOW</span> the job's <strong>Tasks</strong> tab.
@@ -673,7 +773,9 @@
     Ensure these have been run (once): <code class="inline">00_run_all</code> (data + semantics) →
     <code class="inline">04a_resources</code> → <code class="inline">05a_create_genie_spaces</code> →
     <code class="inline">06a_create_mas</code> →
-    <code class="inline">09a_create_domains</code> (domains, subdomains &amp; Pages) →
+    <code class="inline">09a_create_domains</code> (governed tags, domains &amp; subdomains) →
+    optionally <code class="inline">09b_create_pages</code> (governed Pages — requires manual creation if
+    API unavailable) →
     <code class="inline">07a_benchmark</code> →
     <code class="inline">08a_create_jobs</code> (the data-prep Job) → deploy the app
     (<code class="inline">app/deploy_app</code>). Verify the <strong>Discover</strong> page shows the

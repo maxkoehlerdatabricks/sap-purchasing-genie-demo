@@ -32,9 +32,9 @@
 # We wrap widget creation in try/except so this file can also be imported in a
 # plain Python context (e.g. unit-style testing) where dbutils is not present.
 try:
-    dbutils.widgets.text("catalog", "serverless_stable_7qzrfp_catalog", "Unity Catalog (existing, taken as-is)")
+    dbutils.widgets.text("catalog", "max_kohler_demo_catalog", "Unity Catalog (existing, taken as-is)")
     dbutils.widgets.text("schema", "purchasing_demo", "Schema (created by the demo)")
-    dbutils.widgets.text("warehouse_id", "117d425266741646", "Serverless SQL Warehouse ID")
+    dbutils.widgets.text("warehouse_id", "d7a3d1cfbba73c0a", "Serverless SQL Warehouse ID")
 except NameError:
     pass
 
@@ -63,9 +63,9 @@ class DemoConfig:
             self.schema = dbutils.widgets.get("schema")
             self.warehouse_id = dbutils.widgets.get("warehouse_id")
         except Exception:
-            self.catalog = "serverless_stable_7qzrfp_catalog"
+            self.catalog = "max_kohler_demo_catalog"
             self.schema = "purchasing_demo"
-            self.warehouse_id = "117d425266741646"
+            self.warehouse_id = "d7a3d1cfbba73c0a"
 
         # ---- Derived, fully-qualified namespace ----
         self.namespace = f"{self.catalog}.{self.schema}"

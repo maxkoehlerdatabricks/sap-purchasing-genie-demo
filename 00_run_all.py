@@ -3,7 +3,7 @@
 # [tool.databricks.environment]
 # environment_version = "6"
 # ///
-# DBTITLE 1,Cell 1
+# DBTITLE 1,Title
 # MAGIC %md
 # MAGIC # 00_run_all — TOP-LEVEL Orchestrator (parameterize ONCE here)
 # MAGIC
@@ -23,10 +23,11 @@
 # MAGIC 5. `04_resources/04a_resources`       — ensure warehouse + grant UC permissions.
 # MAGIC 6. `05_genie/05a_create_genie_spaces` — create the 2 Genie spaces + instructions.
 # MAGIC 7. `06_agent/06a_create_mas`          — create the Agent Bricks MAS + endpoint.
-# MAGIC 8. `09_domains/09a_create_domains`    — create Discover domains, subdomains & Pages.
-# MAGIC 9. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
-# MAGIC 10. `08_jobs/08a_create_jobs`          — register the serverless data-prep Job.
-# MAGIC 11. `app/deploy_app`                   — create & deploy the Databricks App.
+# MAGIC 8. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
+# MAGIC 9. `08_jobs/08a_create_jobs`          — register the serverless data-prep Job.
+# MAGIC 10. `app/deploy_app`                   — create & deploy the Databricks App.
+# MAGIC 11. `09_domains/09a_create_domains`    — create governed tags, Discover domains & subdomains.
+# MAGIC     `09_domains/09b_create_pages`      — create governed Pages (**commented out** — Pages API not yet available).
 # MAGIC
 # MAGIC ## What it does NOT run
 # MAGIC * `99_teardown` — destructive cleanup (deletes everything). Run manually when needed.
@@ -44,9 +45,9 @@
 # COMMAND ----------
 
 # ---- The single source of truth for the whole pipeline (Python "X = ..." style) ----
-CATALOG = "classic_stable_3n1juw_catalog"   # Unity Catalog (existing, taken as-is)
+CATALOG = "max_kohler_demo_catalog"   # Unity Catalog (existing, taken as-is)
 SCHEMA = "purchasing_demo"                       # Schema (created by the demo)
-WAREHOUSE_ID = "db9813035505e7b0"               # Serverless SQL Warehouse ID
+WAREHOUSE_ID = "d7a3d1cfbba73c0a"               # Serverless SQL Warehouse ID
 
 print(f"Orchestrating with: catalog={CATALOG}  schema={SCHEMA}  warehouse_id={WAREHOUSE_ID}")
 
@@ -177,23 +178,9 @@ run_child("./06_agent/06a_create_mas")            # Agent Bricks MAS + serving e
 
 # COMMAND ----------
 
-# DBTITLE 1,Step 7 — Discover domains & Pages
-# MAGIC %md
-# MAGIC ## 7) Create Discover domains, subdomains & governed Pages
-# MAGIC Organises gold tables, metric views, functions, and Genie spaces into a
-# MAGIC business-aligned hierarchy on the Discover page. Creates 5 governed Pages
-# MAGIC (business glossary) that Genie One reads as ontology.
-
-# COMMAND ----------
-
-# DBTITLE 1,Run 09a_create_domains
-run_child("./09_domains/09a_create_domains")
-
-# COMMAND ----------
-
 # DBTITLE 1,Step 7 — Benchmark, Job & App
 # MAGIC %md
-# MAGIC ## 8) Benchmark, serverless Job & App deployment
+# MAGIC ## 7) Benchmark, serverless Job & App deployment
 # MAGIC Benchmark validates accuracy against known-good SQL (and optionally queries the
 # MAGIC MAS). The Job wraps `00_run_all` for scheduled re-runs. The App is deployed last.
 
@@ -203,6 +190,359 @@ run_child("./09_domains/09a_create_domains")
 run_child("./07_benchmark/07a_benchmark")    # accuracy benchmark
 run_child("./08_jobs/08a_create_jobs")       # serverless data-prep Job
 run_child("./app/deploy_app")               # Databricks App (React + FastAPI)
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 8 — Discover domains
+# MAGIC %md
+# MAGIC ## 8) Create Discover domains & subdomains (tags + asset tagging + publish)
+# MAGIC Organises gold tables, metric views, functions, and Genie spaces into a
+# MAGIC business-aligned hierarchy on the Discover page.
+# MAGIC
+# MAGIC > **Pages** (business glossary) are in a separate notebook `09b_create_pages`.
+# MAGIC > The Pages API is not yet available on this workspace, so the call is
+# MAGIC > commented out below. See `09b_create_pages` for manual creation instructions
+# MAGIC > (UI or Genie Code prompt) and how to publish pages from draft to production.
+
+# COMMAND ----------
+
+# DBTITLE 1,Run 09a (+ 09b commented out)
+run_child("./09_domains/09a_create_domains")  # governed tags + domains + asset tagging + publish
+
+# ---- Pages (commented out — Pages API not yet available on this workspace) ----
+# Uncomment the line below when the /api/2.0/pages endpoint is enabled.
+# Until then, create pages manually — see 09b_create_pages for instructions.
+# run_child("./09_domains/09b_create_pages")
+
+displayHTML("""
+<div style="border:3px solid #D32F2F; border-radius:10px; padding:18px 22px; margin:16px 0;
+            background:#FFEBEE; color:#B71C1C; font-size:15px; line-height:1.6;">
+  <strong style="font-size:17px;">⚠️ MANUAL STEP REQUIRED — Governed Pages</strong><br/>
+  The 5 governed <b>Pages</b> (business glossary) must be created <b>manually</b>
+  because the Pages REST API is not yet available on this workspace.<br/><br/>
+  👉 Scroll down to <b>"Manual Page Creation"</b> (the cells below this one)
+  for step-by-step instructions (Discover UI or Genie Code prompt) and the
+  full content for each page.<br/><br/>
+  After creating them, <b>publish</b> each page (draft → production) so Genie One
+  can read them as ontology.
+</div>
+""")
+
+# COMMAND ----------
+
+# DBTITLE 1,Manual Page creation instructions
+# MAGIC %md
+# MAGIC ## Manual Page Creation (Pages API not yet available)
+# MAGIC
+# MAGIC The 5 governed **Pages** below are business-term definitions that Genie One reads
+# MAGIC as ontology. Because the Pages REST API (`/api/2.0/pages`) is not yet exposed on
+# MAGIC this workspace, create them manually using one of the two methods below.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Method A — Create via the Discover UI
+# MAGIC
+# MAGIC 1. Open **Discover** (left sidebar → Discover).
+# MAGIC 2. Click the target **domain** or **subdomain** (noted in each page below).
+# MAGIC 3. Click **"+ New page"** (top-right within the domain).
+# MAGIC 4. Fill in the **Name**, **Description**, **Synonyms**, and **Body** exactly as shown.
+# MAGIC 5. Optionally attach **Related assets** (tables, metric views, functions).
+# MAGIC 6. Click **Save** — this creates the page as a **draft**.
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Method B — Create via Genie Code prompt
+# MAGIC
+# MAGIC 1. Open the **Discover** page in your workspace.
+# MAGIC 2. Open **Genie Code** (the assistant sidebar).
+# MAGIC 3. Copy the prompt from each page cell below and paste it into Genie Code.
+# MAGIC 4. Genie Code will create the page for you (as a **draft**).
+# MAGIC
+# MAGIC ---
+# MAGIC
+# MAGIC ### Publishing a Page (draft → production)
+# MAGIC
+# MAGIC 1. Open **Discover** → navigate to the domain/subdomain containing the page.
+# MAGIC 2. Click the **page name** to open it.
+# MAGIC 3. Click the **"Publish"** button (top-right).
+# MAGIC 4. Confirm the publish action.
+# MAGIC 5. The page is now **live** and visible to all workspace users. Genie One will
+# MAGIC    read it as part of its ontology.
+# MAGIC
+# MAGIC > **Tip:** You can edit a published page at any time. Edits create a new draft
+# MAGIC > that must be re-published to take effect.
+
+# COMMAND ----------
+
+# DBTITLE 1,Page 1 — Multi-Sourcing Strategy
+# MAGIC %md
+# MAGIC ### Page 1 — Multi-Sourcing Strategy
+# MAGIC
+# MAGIC | Field | Value |
+# MAGIC | --- | --- |
+# MAGIC | **Attach to** | Sourcing & Supplier Risk (subdomain) |
+# MAGIC | **Description** | What multi-sourcing means and why it matters for supply continuity. |
+# MAGIC | **Synonyms** | multi-sourcing, single-sourced, dual sourcing, second source |
+# MAGIC | **Related assets** | `mv_sourcing_coverage`, `SOURCING` |
+# MAGIC
+# MAGIC **Body:**
+# MAGIC
+# MAGIC > **Definition** — A material is **multi-sourced** when it has ≥2 valid,
+# MAGIC > non-blocked vendors (IS_VALID_SOURCE = true) in its source list at the relevant
+# MAGIC > plant. Materials below this threshold are flagged as **single-source risks**.
+# MAGIC >
+# MAGIC > **Why it matters** — Single-sourced materials create supply-chain concentration
+# MAGIC > risk: if the sole vendor experiences disruption, the production line has no
+# MAGIC > fallback. Multi-sourcing is the primary mitigation.
+# MAGIC >
+# MAGIC > **Threshold** — The standard threshold is **2**. The certified function
+# MAGIC > `materials_without_multisourcing(min_vendors)` is parameterized so the
+# MAGIC > threshold can be adjusted.
+# MAGIC >
+# MAGIC > **Related assets:**
+# MAGIC > * **Metric view:** `mv_sourcing_coverage` — vendor count by material, plant, group
+# MAGIC > * **Function:** `materials_without_multisourcing(min_vendors)` — Q1
+# MAGIC > * **Table:** `SOURCING` (IS_VALID_SOURCE column)
+# MAGIC
+# MAGIC **Genie Code prompt:**
+# MAGIC
+# MAGIC ````text
+# MAGIC Create a governed Page called "Multi-Sourcing Strategy" in the "Sourcing & Supplier Risk" subdomain.
+# MAGIC Description: What multi-sourcing means and why it matters for supply continuity.
+# MAGIC Synonyms: multi-sourcing, single-sourced, dual sourcing, second source
+# MAGIC Body:
+# MAGIC ## Definition
+# MAGIC A material is multi-sourced when it has ≥2 valid, non-blocked vendors (IS_VALID_SOURCE = true) in its source list at the relevant plant. Materials below this threshold are flagged as single-source risks.
+# MAGIC ## Why it matters
+# MAGIC Single-sourced materials create supply-chain concentration risk: if the sole vendor experiences disruption, the production line has no fallback. Multi-sourcing is the primary mitigation.
+# MAGIC ## Threshold
+# MAGIC The standard threshold is 2. The certified function materials_without_multisourcing(min_vendors) is parameterized so the threshold can be adjusted.
+# MAGIC ## Related assets
+# MAGIC * Metric view: mv_sourcing_coverage — vendor count by material, plant, group
+# MAGIC * Function: materials_without_multisourcing(min_vendors) — Q1
+# MAGIC * Table: SOURCING (IS_VALID_SOURCE column)
+# MAGIC ````
+
+# COMMAND ----------
+
+# DBTITLE 1,Page 2 — Delivery Risk
+# MAGIC %md
+# MAGIC ### Page 2 — Delivery Risk
+# MAGIC
+# MAGIC | Field | Value |
+# MAGIC | --- | --- |
+# MAGIC | **Attach to** | Sourcing & Supplier Risk (subdomain) |
+# MAGIC | **Description** | How delivery risk is defined, assessed, and why it is time-sliced. |
+# MAGIC | **Synonyms** | delivery risk, supplier risk, risk flag, risk score, risk window |
+# MAGIC | **Related assets** | `mv_supplier_risk`, `SUPPLIER_RISK` |
+# MAGIC
+# MAGIC **Body:**
+# MAGIC
+# MAGIC > **Definition** — Delivery risk is a **time-sliced** assessment. A supplier
+# MAGIC > carries **active** delivery risk when:
+# MAGIC > 1. `DELIVERY_RISK_FLAG = 'X'`, **and**
+# MAGIC > 2. The reference date falls **between VALID_FROM and VALID_TO**.
+# MAGIC >
+# MAGIC > Risk outside this window is historical, not current.
+# MAGIC >
+# MAGIC > **Risk dimensions** — Each risk record carries:
+# MAGIC > * **RISK_CATEGORY** — financial, quality, geopolitical, or logistics
+# MAGIC > * **RISK_SCORE** — numeric 0–100 (higher = more severe)
+# MAGIC > * **DELIVERY_RISK_FLAG** — 'X' if the supplier is flagged
+# MAGIC >
+# MAGIC > **Why it matters** — A material that is **single-sourced AND its sole supplier
+# MAGIC > has active delivery risk** is the highest-priority supply-continuity exposure.
+# MAGIC >
+# MAGIC > **Related assets:**
+# MAGIC > * **Metric view:** `mv_supplier_risk` — risk exposure by category/flag/country
+# MAGIC > * **Function:** `single_sourced_risky(as_of_date)` — Q3
+# MAGIC > * **Table:** `SUPPLIER_RISK` (VALID_FROM, VALID_TO columns)
+# MAGIC
+# MAGIC **Genie Code prompt:**
+# MAGIC
+# MAGIC ````text
+# MAGIC Create a governed Page called "Delivery Risk" in the "Sourcing & Supplier Risk" subdomain.
+# MAGIC Description: How delivery risk is defined, assessed, and why it is time-sliced.
+# MAGIC Synonyms: delivery risk, supplier risk, risk flag, risk score, risk window
+# MAGIC Body:
+# MAGIC ## Definition
+# MAGIC Delivery risk is a time-sliced assessment. A supplier carries active delivery risk when:
+# MAGIC 1. DELIVERY_RISK_FLAG = 'X', and
+# MAGIC 2. The reference date falls between VALID_FROM and VALID_TO.
+# MAGIC Risk outside this window is historical, not current.
+# MAGIC ## Risk dimensions
+# MAGIC Each risk record carries:
+# MAGIC * RISK_CATEGORY — financial, quality, geopolitical, or logistics
+# MAGIC * RISK_SCORE — numeric 0–100 (higher = more severe)
+# MAGIC * DELIVERY_RISK_FLAG — 'X' if the supplier is flagged
+# MAGIC ## Why it matters
+# MAGIC A material that is single-sourced AND its sole supplier has active delivery risk is the highest-priority supply-continuity exposure.
+# MAGIC ## Related assets
+# MAGIC * Metric view: mv_supplier_risk — risk exposure by category/flag/country
+# MAGIC * Function: single_sourced_risky(as_of_date) — Q3
+# MAGIC * Table: SUPPLIER_RISK (VALID_FROM, VALID_TO columns)
+# MAGIC ````
+
+# COMMAND ----------
+
+# DBTITLE 1,Page 3 — On-Time Delivery (OTD)
+# MAGIC %md
+# MAGIC ### Page 3 — On-Time Delivery (OTD)
+# MAGIC
+# MAGIC | Field | Value |
+# MAGIC | --- | --- |
+# MAGIC | **Attach to** | Purchase Order Analytics (subdomain) |
+# MAGIC | **Description** | How OTD rate is calculated and what counts as on-time. |
+# MAGIC | **Synonyms** | OTD, on-time delivery, on-time rate, delivery performance |
+# MAGIC | **Related assets** | `mv_delivery_performance`, `PURCHASE_ORDER` |
+# MAGIC
+# MAGIC **Body:**
+# MAGIC
+# MAGIC > **Definition** — **OTD rate** = on-time lines ÷ received lines. A PO line is
+# MAGIC > **on-time** when `GR_DATE ≤ REQUESTED_DATE` (goods received by the requested
+# MAGIC > date). Lines where `GR_DATE IS NULL` (not yet received) are **excluded** from
+# MAGIC > both numerator and denominator.
+# MAGIC >
+# MAGIC > **Standard window** — The default analysis window is the **last 12 months** of
+# MAGIC > goods-receipt dates.
+# MAGIC >
+# MAGIC > **Why it matters** — OTD is the primary measure of supplier delivery
+# MAGIC > performance. Suppliers with persistently low OTD rates are candidates for
+# MAGIC > escalation, re-sourcing, or additional risk mitigation.
+# MAGIC >
+# MAGIC > **Related assets:**
+# MAGIC > * **Metric view:** `mv_delivery_performance` — OTD % by supplier/plant/month
+# MAGIC > * **Table:** `PURCHASE_ORDER` (ON_TIME_FLAG, GR_DATE columns)
+# MAGIC
+# MAGIC **Genie Code prompt:**
+# MAGIC
+# MAGIC ````text
+# MAGIC Create a governed Page called "On-Time Delivery (OTD)" in the "Purchase Order Analytics" subdomain.
+# MAGIC Description: How OTD rate is calculated and what counts as on-time.
+# MAGIC Synonyms: OTD, on-time delivery, on-time rate, delivery performance
+# MAGIC Body:
+# MAGIC ## Definition
+# MAGIC OTD rate = on-time lines ÷ received lines. A PO line is on-time when GR_DATE ≤ REQUESTED_DATE (goods received by the requested date). Lines where GR_DATE IS NULL (not yet received) are excluded from both numerator and denominator.
+# MAGIC ## Standard window
+# MAGIC The default analysis window is the last 12 months of goods-receipt dates.
+# MAGIC ## Why it matters
+# MAGIC OTD is the primary measure of supplier delivery performance. Suppliers with persistently low OTD rates are candidates for escalation, re-sourcing, or additional risk mitigation.
+# MAGIC ## Related assets
+# MAGIC * Metric view: mv_delivery_performance — OTD % by supplier/plant/month
+# MAGIC * Table: PURCHASE_ORDER (ON_TIME_FLAG, GR_DATE columns)
+# MAGIC ````
+
+# COMMAND ----------
+
+# DBTITLE 1,Page 4 — Quota Arrangement
+# MAGIC %md
+# MAGIC ### Page 4 — Quota Arrangement
+# MAGIC
+# MAGIC | Field | Value |
+# MAGIC | --- | --- |
+# MAGIC | **Attach to** | Sourcing & Supplier Risk (subdomain) |
+# MAGIC | **Description** | How procurement volume is split across approved vendors. |
+# MAGIC | **Synonyms** | quota, quota split, quota concentration, vendor share |
+# MAGIC | **Related assets** | `SOURCING` |
+# MAGIC
+# MAGIC **Body:**
+# MAGIC
+# MAGIC > **Definition** — A **quota arrangement** splits procurement of a material across
+# MAGIC > approved vendors by percentage. The `QUOTA` column in the SOURCING table
+# MAGIC > represents the vendor's allocated share.
+# MAGIC >
+# MAGIC > **NULL quota** — A `NULL` quota means the vendor is **listed as a valid source**
+# MAGIC > but has **no formal quota split** assigned. This is a meaningful gap, not a data
+# MAGIC > error — it indicates the source list is approved but procurement volume
+# MAGIC > allocation is not governed.
+# MAGIC >
+# MAGIC > **Concentration risk** — When a single vendor holds **>80%** of the quota for a
+# MAGIC > material, it represents a concentration risk even if the material is technically
+# MAGIC > multi-sourced. The function `quota_concentration(threshold_pct)` flags these
+# MAGIC > cases.
+# MAGIC >
+# MAGIC > **Related assets:**
+# MAGIC > * **Function:** `quota_concentration(threshold_pct)` — Q6
+# MAGIC > * **Table:** `SOURCING` (QUOTA column)
+# MAGIC
+# MAGIC **Genie Code prompt:**
+# MAGIC
+# MAGIC ````text
+# MAGIC Create a governed Page called "Quota Arrangement" in the "Sourcing & Supplier Risk" subdomain.
+# MAGIC Description: How procurement volume is split across approved vendors.
+# MAGIC Synonyms: quota, quota split, quota concentration, vendor share
+# MAGIC Body:
+# MAGIC ## Definition
+# MAGIC A quota arrangement splits procurement of a material across approved vendors by percentage. The QUOTA column in the SOURCING table represents the vendor's allocated share.
+# MAGIC ## NULL quota
+# MAGIC A NULL quota means the vendor is listed as a valid source but has no formal quota split assigned. This is a meaningful gap, not a data error — it indicates the source list is approved but procurement volume allocation is not governed.
+# MAGIC ## Concentration risk
+# MAGIC When a single vendor holds >80% of the quota for a material, it represents a concentration risk even if the material is technically multi-sourced. The function quota_concentration(threshold_pct) flags these cases.
+# MAGIC ## Related assets
+# MAGIC * Function: quota_concentration(threshold_pct) — Q6
+# MAGIC * Table: SOURCING (QUOTA column)
+# MAGIC ````
+
+# COMMAND ----------
+
+# DBTITLE 1,Page 5 — SAP Code Glossary
+# MAGIC %md
+# MAGIC ### Page 5 — SAP Code Glossary
+# MAGIC
+# MAGIC | Field | Value |
+# MAGIC | --- | --- |
+# MAGIC | **Attach to** | SAP Purchasing **parent domain** (not a subdomain) |
+# MAGIC | **Description** | How cryptic SAP codes are translated to human-readable labels. |
+# MAGIC | **Synonyms** | SAP codes, value dictionary, code mapping, MTART, SPERM, NOTKZ |
+# MAGIC | **Related assets** | `VALUE_DICTIONARY` |
+# MAGIC
+# MAGIC **Body:**
+# MAGIC
+# MAGIC > **Definition** — SAP uses **short alphanumeric codes** throughout its modules.
+# MAGIC > The `VALUE_DICTIONARY` table maps each code to a human-readable label so that
+# MAGIC > Genie (and humans) can translate between plain English and SAP terminology.
+# MAGIC >
+# MAGIC > **Key domains:**
+# MAGIC >
+# MAGIC > | Code domain | Example code | Meaning |
+# MAGIC > | --- | --- | --- |
+# MAGIC > | MTART (material type) | ROH | Raw material |
+# MAGIC > | MATKL (material group) | 001 | Mechanical components |
+# MAGIC > | SPERM (purchasing block) | X | Supplier is blocked for purchasing |
+# MAGIC > | NOTKZ (source-list block) | X | Source record is blocked |
+# MAGIC > | DELIVERY_RISK_FLAG | X | Active delivery risk |
+# MAGIC > | LAND1 (country) | DE | Germany |
+# MAGIC >
+# MAGIC > **How Genie uses it** — When a user asks about 'blocked suppliers', Genie
+# MAGIC > translates this to `SPERM = 'X'` using the value dictionary. When a user asks
+# MAGIC > about 'raw materials', Genie translates to `MTART = 'ROH'`.
+# MAGIC >
+# MAGIC > **Related assets:**
+# MAGIC > * **Table:** `VALUE_DICTIONARY` (DOMAIN, CODE, LABEL, DESCRIPTION columns)
+# MAGIC
+# MAGIC **Genie Code prompt:**
+# MAGIC
+# MAGIC ````text
+# MAGIC Create a governed Page called "SAP Code Glossary" in the "SAP Purchasing" PARENT domain (not a subdomain).
+# MAGIC Description: How cryptic SAP codes are translated to human-readable labels.
+# MAGIC Synonyms: SAP codes, value dictionary, code mapping, MTART, SPERM, NOTKZ
+# MAGIC Body:
+# MAGIC ## Definition
+# MAGIC SAP uses short alphanumeric codes throughout its modules. The VALUE_DICTIONARY table maps each code to a human-readable label so that Genie (and humans) can translate between plain English and SAP terminology.
+# MAGIC ## Key domains
+# MAGIC | Code domain | Example code | Meaning |
+# MAGIC | --- | --- | --- |
+# MAGIC | MTART (material type) | ROH | Raw material |
+# MAGIC | MATKL (material group) | 001 | Mechanical components |
+# MAGIC | SPERM (purchasing block) | X | Supplier is blocked for purchasing |
+# MAGIC | NOTKZ (source-list block) | X | Source record is blocked |
+# MAGIC | DELIVERY_RISK_FLAG | X | Active delivery risk |
+# MAGIC | LAND1 (country) | DE | Germany |
+# MAGIC ## How Genie uses it
+# MAGIC When a user asks about 'blocked suppliers', Genie translates this to SPERM = 'X' using the value dictionary. When a user asks about 'raw materials', Genie translates to MTART = 'ROH'.
+# MAGIC ## Related assets
+# MAGIC * Table: VALUE_DICTIONARY (DOMAIN, CODE, LABEL, DESCRIPTION columns)
+# MAGIC ````
 
 # COMMAND ----------
 

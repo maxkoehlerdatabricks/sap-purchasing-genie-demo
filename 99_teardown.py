@@ -3,6 +3,7 @@
 # [tool.databricks.environment]
 # environment_version = "6"
 # ///
+# DBTITLE 1,Title
 # MAGIC %md
 # MAGIC # 99_teardown — DELETE every asset this demo creates
 # MAGIC
@@ -17,7 +18,10 @@
 # MAGIC    `_MAS_ENDPOINT`, falling back to the tiles API by name).
 # MAGIC 4. **Genie spaces** — both, looked up from `_GENIE_SPACES`, falling back to the
 # MAGIC    data-rooms API by display name.
-# MAGIC 5. **The whole schema** `catalog.schema` (all gold + raw + metric views + SQL
+# MAGIC 5. **Discover pages, domains & governed tags** *(optional, controlled by
+# MAGIC    `DELETE_DISCOVER`)* — deletes all 5 governed pages, the 3 domains/subdomains,
+# MAGIC    and the 3 governed tag policies.
+# MAGIC 6. **The whole schema** `catalog.schema` (all gold + raw + metric views + SQL
 # MAGIC    functions + the `_*` metadata tables) via `DROP SCHEMA ... CASCADE`.
 # MAGIC
 # MAGIC ## What it does NOT delete (intentionally)
@@ -35,8 +39,9 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Config
 # ---- The single source of truth for what to tear down ----
-CATALOG = "serverless_stable_7qzrfp_catalog"   # Unity Catalog (existing, taken as-is)
+CATALOG = "max_kohler_demo_catalog"              # Unity Catalog (existing, taken as-is)
 SCHEMA = "purchasing_demo"                       # Schema created by the demo (will be DROPPED)
 
 # Asset names (must match 00_config.py).
@@ -46,18 +51,40 @@ JOB_NAME = "sap_purchasing_data_prep"
 GENIE_SPACE_1_NAME = "SAP Purchasing — Sourcing & Supplier Risk"
 GENIE_SPACE_2_NAME = "SAP Purchasing — Purchase Order Analytics"
 
+# ---- Discover assets (governed tags, domains, pages) ----
+# Set to False to keep tags, domains and pages when tearing down.
+DELETE_DISCOVER = True
+
+# Governed tag keys (must match 09a_create_domains).
+PARENT_TAG = "SAP_Purchasing"
+SUB_TAG_1 = f"{PARENT_TAG}/Sourcing_Supplier_Risk"
+SUB_TAG_2 = f"{PARENT_TAG}/Purchase_Order_Analytics"
+DISCOVER_TAG_KEYS = [SUB_TAG_1, SUB_TAG_2, PARENT_TAG]  # delete children first
+
+# Page names (must match 09b_create_pages).
+PAGE_NAMES = [
+    "Multi-Sourcing Strategy",
+    "Delivery Risk",
+    "On-Time Delivery (OTD)",
+    "Quota Arrangement",
+    "SAP Code Glossary",
+]
+
 NS = f"{CATALOG}.{SCHEMA}"
 print(f"About to tear down everything under: {NS}")
+print(f"DELETE_DISCOVER = {DELETE_DISCOVER}")
 
 # COMMAND ----------
 
+# DBTITLE 1,SDK + helpers
 from databricks.sdk import WorkspaceClient
 
 w = WorkspaceClient()
 
 
 def _do(method, path, body=None, params=None):
-    return w.api_client.do(method, path, body=body, query=params)
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
+    return w.api_client.do(method, path, body=body, query=params, headers=headers)
 
 
 def _table_exists(fq):
@@ -215,8 +242,125 @@ for sid in space_ids:
 
 # COMMAND ----------
 
+# DBTITLE 1,Step 5 heading
 # MAGIC %md
-# MAGIC ## 5) Drop the whole schema (tables, views, functions, metadata)
+# MAGIC ## 5) Delete Discover pages, domains & governed tags (optional)
+# MAGIC Controlled by `DELETE_DISCOVER`. Deletes in reverse dependency order:
+# MAGIC pages → domains (children first) → governed tag policies.
+
+# COMMAND ----------
+
+# DBTITLE 1,Delete Discover assets
+if not DELETE_DISCOVER:
+    print("  (DELETE_DISCOVER=False — skipping pages, domains & governed tags)")
+else:
+    # ---- 5a) Discover the APIs ----
+    DOMAINS_API = None
+    for candidate in ["/api/2.0/domains", "/api/2.1/domains"]:
+        try:
+            _do("GET", candidate)
+            DOMAINS_API = candidate
+            break
+        except Exception:
+            pass
+
+    PAGES_API = None
+    for candidate in ["/api/2.0/pages", "/api/2.1/pages",
+                      "/api/2.0/discover/pages", "/api/2.1/discover/pages"]:
+        try:
+            _do("GET", candidate)
+            PAGES_API = candidate
+            break
+        except Exception as e:
+            if "Not Found" not in str(e) and "No API found" not in str(e) and "404" not in str(e):
+                PAGES_API = candidate
+                break
+
+    # ---- 5b) Delete governed Pages ----
+    print("\n--- Deleting governed Pages ---")
+    if PAGES_API:
+        try:
+            resp = _do("GET", PAGES_API)
+            all_pages = resp.get("pages", [])
+            for pname in PAGE_NAMES:
+                found = [p for p in all_pages if (p.get("name") or "") == pname]
+                for p in found:
+                    pid = p.get("page_id") or p.get("id")
+                    try:
+                        _do("DELETE", f"{PAGES_API}/{pid}")
+                        print(f"  \u2713 Deleted page: {pname} (id={pid})")
+                    except Exception as e:
+                        print(f"  \u2022 Could not delete page {pname}: {e}")
+                if not found:
+                    print(f"  \u2022 Page not found: {pname}")
+        except Exception as e:
+            print(f"  \u2022 Could not list pages: {e}")
+    else:
+        print("  (Pages API not available — skipping)")
+
+    # ---- 5c) Delete domains (children first, then parent) ----
+    print("\n--- Deleting Discover domains ---")
+    if DOMAINS_API:
+        # Read domain IDs from the _DOMAINS table if available
+        domain_ids = {}
+        if _table_exists(f"{NS}._DOMAINS"):
+            for r in spark.table(f"{NS}._DOMAINS").collect():
+                domain_ids[r["domain_key"]] = r["domain_id"]
+        # Fall back to listing from the API
+        if not domain_ids:
+            try:
+                resp = _do("GET", DOMAINS_API)
+                for d in resp.get("domains", []):
+                    tk = d.get("tag_key", "")
+                    did = d.get("domain_id")
+                    if tk in DISCOVER_TAG_KEYS:
+                        domain_ids[tk] = did
+            except Exception:
+                pass
+        # Delete in order: subdomains first, parent last
+        for tag_key in DISCOVER_TAG_KEYS:
+            did = domain_ids.get(tag_key)
+            if not did:
+                print(f"  \u2022 Domain not found: {tag_key}")
+                continue
+            try:
+                _do("DELETE", f"{DOMAINS_API}/{did}", params={"force": "true"})
+                print(f"  \u2713 Deleted domain: {tag_key} (id={did})")
+            except Exception as e:
+                if "not found" in str(e).lower():
+                    print(f"  \u2022 Already deleted: {tag_key}")
+                else:
+                    print(f"  \u2022 Could not delete domain {tag_key}: {e}")
+    else:
+        print("  (Domains API not available — skipping)")
+
+    # ---- 5d) Delete governed tag policies ----
+    print("\n--- Deleting governed tag policies ---")
+    try:
+        all_policies = list(w.tag_policies.list_tag_policies())
+        for tag_key in DISCOVER_TAG_KEYS:
+            found = [p for p in all_policies if p.tag_key == tag_key]
+            for p in found:
+                try:
+                    _do("DELETE", f"/api/2.1/unity-catalog/tag-policies/{p.id}")
+                    print(f"  \u2713 Deleted tag policy: {tag_key} (id={p.id})")
+                except Exception as e:
+                    if "not found" in str(e).lower():
+                        print(f"  \u2022 Already deleted: {tag_key}")
+                    else:
+                        print(f"  \u2022 Could not delete tag policy {tag_key}: {e}")
+            if not found:
+                print(f"  \u2022 Tag policy not found: {tag_key}")
+    except Exception as e:
+        print(f"  \u2022 Could not list tag policies: {e}")
+
+    print("\n\u2713 Discover teardown complete.")
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 6 heading
+# MAGIC %md
+# MAGIC ## 6) Drop the whole schema (tables, views, functions, metadata)
 # MAGIC `DROP SCHEMA ... CASCADE` removes all 5 gold tables, the 13 raw tables, the 4
 # MAGIC metric views, all SQL functions, `VALUE_DICTIONARY`, and the `_GENIE_SPACES` /
 # MAGIC `_MAS_ENDPOINT` / `_BENCHMARK_RESULTS` metadata tables in one shot.
@@ -242,4 +386,6 @@ except Exception as e:
 
 # COMMAND ----------
 
-dbutils.notebook.exit(f"99_teardown: SUCCESS — all demo assets under {NS} removed.")
+# DBTITLE 1,Exit
+discover_msg = " (incl. Discover tags/domains/pages)" if DELETE_DISCOVER else " (Discover tags/domains/pages kept)"
+dbutils.notebook.exit(f"99_teardown: SUCCESS — all demo assets under {NS} removed{discover_msg}.")

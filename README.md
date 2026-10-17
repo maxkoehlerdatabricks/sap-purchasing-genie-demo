@@ -10,9 +10,12 @@ It builds, end-to-end and on a blank workspace:
   table & column comments).
 - A **semantic layer**: parameterized **SQL functions** (trusted assets), **UC metric
   views**, and a **value dictionary**.
-- **2 Genie spaces** (domain-split) with **all instruction types** + certified answers.
+- **2 Genie spaces** (domain-split) with **all instruction types** (ontology snippets)
+  + certified answers.
 - An **Agent Bricks Multi-Agent Supervisor (MAS)** over the two spaces, deployed as a
   serving endpoint.
+- **Governed tags**, **Discover domains/subdomains**, and **5 governed Pages** (business
+  glossary) — the ontology layer that Genie One reads.
 - A **benchmark** of representative questions with known-good SQL and an **accuracy
   score**.
 - A **Databricks App** (React + FastAPI) with visualizations + a chat interface over
@@ -95,7 +98,7 @@ sap-purchasing-genie-demo/
     04a_resources.py                # warehouse + permissions (Python SDK)
   05_genie/
     05a_create_genie_spaces.py      # create 2 Genie spaces + all instruction types
-    genie_instructions_space1.md    # instructions (with "use first" recommendations)
+    genie_instructions_space1.md    # instructions / ontology snippets (with "use first" recommendations)
     genie_instructions_space2.md
   06_agent/
     06a_create_mas.py               # Agent Bricks MAS + serving endpoint
@@ -104,8 +107,11 @@ sap-purchasing-genie-demo/
     benchmark_questions.yaml
   08_jobs/
     08a_create_jobs.py              # serverless data-prep Job (Python SDK)
+  09_domains/
+    09a_create_domains.py           # governed tags + Discover domains/subdomains + asset tagging
+    09b_create_pages.py             # governed Pages (business glossary) — API or manual
   app/                              # Databricks App (React + FastAPI)
-  99_teardown.py                    # DELETE every asset the demo creates (app, job, MAS, Genie, schema)
+  99_teardown.py                    # DELETE every asset (app, job, MAS, Genie, domains, tags, schema)
   demo_script.html                  # comprehensive demo walkthrough
 ```
 
@@ -122,18 +128,26 @@ create Genie spaces + Agent Bricks + serving endpoints + Apps.
    `WAREHOUSE_ID` Python variables **once** at the top, then Run All. It orchestrates
    everything in order: raw simulation → gold Workflows A–E → constraints/comments →
    SQL functions → metric views → value dictionary → warehouse & permissions → 2 Genie
-   spaces → MAS + serving endpoint → benchmark → serverless Job → Databricks App.
+   spaces → MAS + serving endpoint → governed tags + Discover domains →
+    benchmark → serverless Job → Databricks App.
 
 Each child notebook can still be run individually (it reads the same parameters), but
 `00_run_all` is the single-command path for a full deployment.
+
+**Governed Pages** (business glossary) are created by `09b_create_pages` — the Pages REST
+API may not be available on all workspaces. If the API is not exposed, `09b` provides
+manual creation instructions (Discover UI + Genie Code prompts). The page prompts are also
+inlined in `00_run_all` for easy reference.
 
 ### Teardown
 Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates —
 the App, the data-prep Job, the MAS + serving endpoint, both Genie spaces, and the entire
 schema (`DROP SCHEMA … CASCADE`, which removes all gold/raw tables, metric views, SQL
-functions and the `_*` metadata tables). The **catalog** and the **SQL warehouse** are left
-in place (neither is created by the demo). Remove the workspace source folders separately via
-the Workspace UI or `databricks workspace delete … --recursive`.
+functions and the `_*` metadata tables). Set `DELETE_DISCOVER = True` (the default) to also
+delete governed Pages, Discover domains, and governed tag policies; set it to `False` to keep
+them. The **catalog** and the **SQL warehouse** are left in place (neither is created by the
+demo). Remove the workspace source folders separately via the Workspace UI or
+`databricks workspace delete … --recursive`.
 
 ### Parameterization
 `00_config.py` defines defaults and reads widgets. `00_run_all.py` sets `catalog` / `schema` /
@@ -147,13 +161,13 @@ the **schema is created**.
 
 | Setting | Value |
 |---------|-------|
-| Catalog | `serverless_stable_7qzrfp_catalog` (existing) |
+| Catalog | `max_kohler_demo_catalog` (existing) |
 | Schema | `purchasing_demo` (created) |
-| Warehouse | `Serverless Starter Warehouse` (`117d425266741646`) |
+| Warehouse | Serverless SQL Warehouse (`d7a3d1cfbba73c0a`) |
 | LLM | `databricks-claude-sonnet-4-5` |
 | Genie Space 1 | SAP Purchasing — Sourcing & Supplier Risk |
 | Genie Space 2 | SAP Purchasing — Purchase Order Analytics |
-| MAS endpoint | `mas-655dcd32-endpoint` |
+| MAS endpoint | `sap-purchasing-mas` |
 
 ---
 
