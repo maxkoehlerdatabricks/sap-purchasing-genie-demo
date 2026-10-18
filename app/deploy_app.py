@@ -200,6 +200,7 @@ print(f"App URL: {app.url}")
 
 # COMMAND ----------
 
+# MAGIC %md
 # MAGIC ## Grant the App's service principal CAN_RUN on the Genie spaces
 # MAGIC The MAS/Genie spaces run as `VIEWER`, so the **caller's** identity is used for the
 # MAGIC query. When the chat tab runs, the caller is the App's service principal — it must
