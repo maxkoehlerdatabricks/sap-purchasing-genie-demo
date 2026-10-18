@@ -672,12 +672,11 @@
       commit. Foreign keys, check constraints, a unique index: this is a proper operational database,
       not a spreadsheet."</div>
     </li>
-    <li><span class="click-label">CLICK</span> <strong>Open case</strong> on the row you just used, if it is
-      still visible, or explain the rule.
-      <div class="say">"If someone else tries to open a second active case on the same material, Postgres
-      rejects it. One material, one owner, no duplicate work."</div>
-      <div class="tip">The partial unique index allows one active (OPEN or IN_PROGRESS) case per
-      material and plant. The App shows the 409 as a toast.</div>
+    <li><span class="click-label">POINT</span> at the row you just used: its <strong>Open case</strong> button is gone.
+      <div class="say">"And if two buyers click at the same moment, Postgres decides. A second active case
+      on the same material is rejected. One material, one owner, no duplicate work."</div>
+      <div class="tip">A partial unique index allows one active (OPEN or IN_PROGRESS) case per material and
+      plant. If a second request arrives, the App shows the rejection (HTTP 409) as a toast.</div>
     </li>
   </ol>
 
