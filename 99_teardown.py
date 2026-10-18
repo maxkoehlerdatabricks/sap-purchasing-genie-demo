@@ -57,8 +57,15 @@ GENIE_SPACE_1_NAME = "SAP Purchasing — Sourcing & Supplier Risk"
 GENIE_SPACE_2_NAME = "SAP Purchasing — Purchase Order Analytics"
 
 # ---- Discover assets (governed tags, domains, pages) ----
-# Set to False to keep tags, domains and pages when tearing down.
+# Set to False to keep tags, domains and pages when tearing down. Can also be overridden
+# with the widget/job parameter `delete_discover` ("true"/"false"), e.g. to keep Pages
+# that were created by hand.
 DELETE_DISCOVER = True
+try:
+    dbutils.widgets.text("delete_discover", str(DELETE_DISCOVER).lower(), "Delete Discover tags/domains/pages")
+    DELETE_DISCOVER = dbutils.widgets.get("delete_discover").strip().lower() == "true"
+except Exception:
+    pass
 
 # Governed tag keys (must match 09a_create_domains).
 PARENT_TAG = "SAP_Purchasing"
