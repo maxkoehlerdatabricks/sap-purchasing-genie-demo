@@ -93,11 +93,29 @@ resources = [
     ),
 ]
 
+from databricks.sdk.errors import NotFound
+
 existing = None
 try:
     existing = w.apps.get(name=APP_NAME)
 except Exception:
     pass
+
+# An app whose service principal was deleted (e.g. by a workspace cleanup) can never
+# get database or Genie access again. Recreate it so it gets a fresh SP.
+if existing is not None and existing.service_principal_id:
+    try:
+        w.service_principals.get(id=str(existing.service_principal_id))
+    except NotFound:
+        print(f"App SP {existing.service_principal_client_id} no longer exists; recreating the app…")
+        w.apps.delete(name=APP_NAME)
+        for _ in range(60):
+            try:
+                w.apps.get(name=APP_NAME)
+                time.sleep(5)
+            except Exception:
+                break
+        existing = None
 
 if existing is None:
     print("Creating app…")
