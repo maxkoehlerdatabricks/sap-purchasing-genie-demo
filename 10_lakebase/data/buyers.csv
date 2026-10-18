@@ -1,0 +1,7 @@
+buyer_id,full_name,email,ekgrp,material_group,role
+B001,Lena Hoffmann,lena.hoffmann@example-oem.com,E01,ELEC,Commodity buyer Electronics
+B002,Jonas Weber,jonas.weber@example-oem.com,M01,MECH,Commodity buyer Mechanical
+B003,Aylin Demir,aylin.demir@example-oem.com,C01,CHEM,Commodity buyer Chemicals
+B004,Marco Rossi,marco.rossi@example-oem.com,R01,ELAST,Commodity buyer Elastomers
+B005,Sofia Novak,sofia.novak@example-oem.com,F01,FAST,Commodity buyer Fasteners
+B006,Daniel Schmitt,daniel.schmitt@example-oem.com,L01,ALL,Lead buyer Supply Continuity

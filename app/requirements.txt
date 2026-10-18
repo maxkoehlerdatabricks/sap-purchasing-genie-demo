@@ -6,3 +6,4 @@ uvicorn[standard]
 databricks-sdk
 databricks-sql-connector
 requests
+psycopg[binary]>=3.1

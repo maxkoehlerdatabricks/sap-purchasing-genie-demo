@@ -1,0 +1,7 @@
+action_code,label,description,typical_lead_time_days
+QUALIFY_SECOND_SOURCE,Qualify second source,"Nominate and qualify an additional vendor (PPAP, source list entry) so the material is no longer single-sourced.",90
+RAISE_SAFETY_STOCK,Raise safety stock,Increase safety stock at the plant to bridge a potential supply interruption.,7
+RENEGOTIATE_QUOTA,Rebalance quota arrangement,Shift quota share away from the at-risk vendor to an existing valid vendor.,14
+SUPPLIER_DEVELOPMENT,Supplier development,"Joint improvement plan with the at-risk supplier (capacity, quality, financial health).",60
+EXPEDITE_OPEN_POS,Expedite open POs,Pull in or expedite open purchase orders with the current supplier.,3
+ACCEPT_RISK,Accept risk (documented),Risk is accepted after review. Requires a justification note.,1

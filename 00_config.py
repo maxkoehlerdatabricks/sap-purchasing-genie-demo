@@ -83,8 +83,22 @@ class DemoConfig:
         self.mas_endpoint_name = "sap-purchasing-mas"
         # Databricks App
         self.app_name = "sap-purchasing-app"
-        # Serverless data-prep Job
-        self.job_name = "sap_purchasing_data_prep"
+        # Lakeflow Job: the multi-task pipeline raw -> gold -> semantics -> Lakebase.
+        self.job_name = "sap_purchasing_lakeflow_pipeline"
+        # Name of the earlier single-task job (only used by teardown to clean it up).
+        self.legacy_job_name = "sap_purchasing_data_prep"
+
+        # ---- Lakebase (operational layer for mitigation cases) ----
+        # Lakebase Autoscaling project + Postgres database + schema the App writes to.
+        self.lakebase_project = "sap-purchasing-ops"
+        self.lakebase_database = "purchasing_ops"
+        self.lakebase_pg_schema = "ops"
+        # UC catalog that registers the Lakebase database, so the warehouse, Genie and
+        # Spark can read the mitigation cases live (federated, no copy).
+        self.lakebase_catalog = "sap_purchasing_ops"
+        # UC schema holding the synced table(s) Delta -> Lakebase. The Postgres schema of
+        # a synced table takes this UC schema name.
+        self.sync_schema = f"{self.schema}_sync"
 
     # ---- Convenience helpers ----
     def fq(self, table: str) -> str:
@@ -103,6 +117,9 @@ class DemoConfig:
             f"  genie_space_2 = {self.genie_space_2_name!r}\n"
             f"  mas_endpoint  = {self.mas_endpoint_name!r}\n"
             f"  app_name      = {self.app_name!r}\n"
+            f"  job_name      = {self.job_name!r}\n"
+            f"  lakebase      = {self.lakebase_project!r}/{self.lakebase_database!r}"
+            f" (UC catalog {self.lakebase_catalog!r})\n"
             ")"
         )
 
@@ -171,6 +188,32 @@ try:
     ensure_schema()
 except Exception as e:  # pragma: no cover
     print(f"[00_config] ensure_schema skipped: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Locate the demo folder in the workspace
+# MAGIC Notebooks that reference sibling paths (the Job, the App deploy) derive the demo
+# MAGIC root from the running notebook's own path, so the folder can be cloned under any
+# MAGIC name (plain folder or Git folder).
+
+# COMMAND ----------
+
+
+def demo_root():
+    """Return the workspace path of the demo folder (the one holding 00_config)."""
+    from databricks.sdk import WorkspaceClient
+    nb_path = dbutils.notebook.entry_point.getDbutils().notebook().getContext().notebookPath().get()
+    ws = WorkspaceClient()
+    d = nb_path.rsplit("/", 1)[0]
+    while d:
+        try:
+            ws.workspace.get_status(f"{d}/00_config")
+            return d if d.startswith("/Workspace") else f"/Workspace{d}"
+        except Exception:
+            d = d.rsplit("/", 1)[0] if "/" in d else ""
+    raise RuntimeError(f"Could not locate 00_config above {nb_path}")
+
 
 # COMMAND ----------
 

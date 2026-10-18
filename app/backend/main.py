@@ -1,10 +1,12 @@
 """SAP Purchasing demo — Databricks App backend (FastAPI).
 
-Two responsibilities:
+Three responsibilities:
   1) /api/charts/*  — run governed queries (metric views + trusted functions) against
      the SQL warehouse and return JSON for the Visualizations tab.
   2) /api/chat      — proxy a user message to the MAS serving endpoint (Responses API)
      and return the assistant's answer for the Chat tab.
+  3) /api/cases/*   — read the synced risk worklist and read/write mitigation cases in
+     Lakebase (Postgres) for the Mitigation cases tab. See backend/cases.py.
 
 Auth model: when running as a Databricks App, credentials come from the app's service
 principal via the environment (the SDK + SQL connector pick these up automatically).
@@ -24,11 +26,12 @@ from pydantic import BaseModel
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("sap-app")
 
-CATALOG = os.environ.get("DEMO_CATALOG", "serverless_stable_7qzrfp_catalog")
+# All values are injected at deploy time by app/deploy_app (from 00_config).
+CATALOG = os.environ.get("DEMO_CATALOG", "max_kohler_demo_catalog")
 SCHEMA = os.environ.get("DEMO_SCHEMA", "purchasing_demo")
 NS = f"{CATALOG}.{SCHEMA}"
-WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "117d425266741646")
-MAS_ENDPOINT = os.environ.get("MAS_ENDPOINT_NAME", "mas-655dcd32-endpoint")
+WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "")
+MAS_ENDPOINT = os.environ.get("MAS_ENDPOINT_NAME", "")
 
 app = FastAPI(title="SAP Purchasing Demo")
 
@@ -102,7 +105,8 @@ def rows_to_records(cols, rows):
 # ---------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "namespace": NS, "mas_endpoint": MAS_ENDPOINT}
+    from backend.cases import LAKEBASE_INFO
+    return {"status": "ok", "namespace": NS, "mas_endpoint": MAS_ENDPOINT, "lakebase": LAKEBASE_INFO}
 
 
 @app.get("/api/charts/sourcing_coverage")
@@ -214,6 +218,14 @@ def chat(req: ChatRequest):
                     else:
                         answer = txt  # keep the last non-routing message as the answer
     return {"answer": answer, "agent": agent, "sql": sql}
+
+
+# ---------------------------------------------------------------------------
+# Mitigation cases (Lakebase) — routes live in backend/cases.py
+# ---------------------------------------------------------------------------
+from backend.cases import router as cases_router  # noqa: E402
+
+app.include_router(cases_router)
 
 
 # ---------------------------------------------------------------------------
