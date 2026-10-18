@@ -55,6 +55,8 @@
       <span class="pill">Metric Views</span>
       <span class="pill">Agent Bricks (MAS)</span>
       <span class="pill">Databricks App</span>
+      <span class="pill">Lakebase</span>
+      <span class="pill">Lakeflow Jobs</span>
     </div>
   </div>
 </header>
@@ -62,10 +64,12 @@
 <div class="wrap">
 
   <p class="lead" style="margin-top:26px;">This script is a <strong>click-through of the Databricks
-  UI</strong>. Each step says exactly where to click, what to say, and what to point out. Total run
-  time ~37 minutes. You can stop after any section.</p>
+  UI</strong>. Each step says exactly where to click, what to say, and what to point out. Core run
+  time ~37 minutes (sections 1 to 10). Sections 11 (Lakebase) and 12 (Lakeflow Jobs) are optional
+  modules of about 7 and 5 minutes for audiences who care about operational apps and pipelines.
+  You can stop after any section.</p>
 
-  <h2 id="toc">Flow <span class="clock">~37 min</span></h2>
+  <h2 id="toc">Flow <span class="clock">~37 min core · ~49 min with modules</span></h2>
   <ol class="toc">
     <li><a href="#warmup">Pre-demo warm-up — seed Genie Ontology (day before)</a></li>
     <li><a href="#genie-one">Genie One — ask in plain English before anything else (6 min)</a></li>
@@ -78,6 +82,8 @@
     <li><a href="#dataprep">Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep (8 min)</a></li>
     <li><a href="#dashboard">AI/BI Dashboard — a filter and two charts (3 min)</a></li>
     <li><a href="#app">The App — one screen for the business (4 min)</a></li>
+    <li><a href="#lakebase">Optional module · From insight to action: mitigation cases on Lakebase (7 min)</a></li>
+    <li><a href="#lakeflow">Optional module · Lakeflow Jobs: one orchestrated pipeline keeps it all fresh (5 min)</a></li>
   </ol>
 
   <!-- ============================================================ -->
@@ -133,6 +139,11 @@
   </ol>
   <div class="tip">The warm-up also ensures the <strong>SQL warehouse is hot</strong>, so the first live
   answer in section 1 returns instantly.</div>
+  <div class="tip"><strong>Reset before every demo (Lakebase module).</strong> Run
+  <code class="inline">10_lakebase/10a_create_lakebase</code> on its own (about 2 minutes). It resets the
+  mitigation cases to the 3 seed cases, so the worklist again shows <strong>10 risks without a case</strong>
+  and the counter in section 11 starts from a known number. Then open the App's
+  <strong>Mitigation cases</strong> tab once so the Lakebase compute is awake.</div>
 
   <!-- ============================================================ -->
   <h2 id="genie-one">1 · Genie One — ask in plain English before anything else <span class="clock">6 min</span></h2>
@@ -621,6 +632,146 @@
       same governed data, functions, and agents. Nothing is bolted on."</div>
     </li>
   </ol>
+
+  <!-- ============================================================ -->
+  <h2 id="lakebase">11 · From insight to action: mitigation cases on Lakebase <span class="clock">7 min · optional</span></h2>
+  <p class="lead">Everything so far ends with an answer. This module shows what happens next: the
+  business <strong>acts</strong> on the answer, and the action becomes governed data that Genie can read.</p>
+  <div class="say">"So far we found the problem. Thirteen materials are single-sourced, and their only supplier is
+  at delivery risk today. In most companies the story stops here. Someone exports a list to Excel, sends an
+  email, and three weeks later nobody knows who is working on what. Let me show you how the same platform
+  closes that loop."</div>
+
+  <h3>11a · Insight: the question we already know</h3>
+  <ol class="clicks">
+    <li><span class="click-label">ASK</span> in Genie space 1 (Sourcing &amp; Supplier Risk):
+      <span class="ask">Which materials are single-sourced and their sole supplier has a delivery-risk flag?</span>
+      <div class="show">13 material/plant combinations. Same answer as in section 5.</div>
+      <div class="say">"This is the list. Now let's act on it."</div>
+    </li>
+  </ol>
+
+  <h3>11b · Action: open a case in the App</h3>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> Apps → <strong>sap-purchasing-app</strong> → tab
+      <strong>Mitigation cases (Lakebase)</strong>.
+      <div class="show">The KPI tiles: <strong>10 risks without an active case</strong>, 13 on the worklist,
+      2 open and 1 in progress. Below, the <strong>risk worklist</strong>: each row has the material, the
+      plant, the sole supplier, the risk score and whether a case exists. The green badge shows the
+      Postgres round-trip, typically <strong>under 10 ms</strong>.</div>
+      <div class="say">"This worklist was computed in the Lakehouse from the governed gold tables. A synced
+      table pushes it into <strong>Lakebase</strong>, our managed Postgres. That is why this screen answers
+      in milliseconds and not seconds. It is the right engine for an application."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Open case</strong> on the top row. Choose
+      <em>Qualify second source</em>. The buyer is pre-selected from the material group. Set priority
+      <em>HIGH</em>, add a note such as "Ask Vendor 20 for a quote", then <strong>Create case</strong>.
+      <div class="show">The toast: <em>"Case #… created in Lakebase (… ms)"</em>. The KPI drops from
+      <strong>10 to 9</strong>. The row moves to the bottom with an OPEN badge.</div>
+      <div class="say">"That was a real transaction. It wrote the case and an audit event together, in one
+      commit. Foreign keys, check constraints, a unique index: this is a proper operational database,
+      not a spreadsheet."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Open case</strong> on the row you just used, if it is
+      still visible, or explain the rule.
+      <div class="say">"If someone else tries to open a second active case on the same material, Postgres
+      rejects it. One material, one owner, no duplicate work."</div>
+      <div class="tip">The partial unique index allows one active (OPEN or IN_PROGRESS) case per
+      material and plant. The App shows the 409 as a toast.</div>
+    </li>
+  </ol>
+
+  <h3>11c · Collaboration: the buyer picks it up</h3>
+  <ol class="clicks">
+    <li><span class="click-label">SELECT</span> the buyer from the <strong>Buyer</strong> filter in the Cases
+      list, for example <em>Aylin Demir (CHEM)</em>.
+      <div class="say">"Now I'm the buyer. I see only my cases."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> <strong>Start</strong> on an OPEN case, then
+      <strong>History</strong>.
+      <div class="show">The status turns IN PROGRESS. The history lists CREATED and STATUS_CHANGE events
+      with time and user.</div>
+      <div class="say">"Many people can work on this at the same time. Every change is audited with who
+      and when. That is what an operational system needs and what a warehouse alone is not built for."</div>
+    </li>
+  </ol>
+
+  <h3>11d · Closed loop: Genie sees the actions live</h3>
+  <ol class="clicks">
+    <li><span class="click-label">ASK</span> in Genie space 1:
+      <span class="ask">Which single-sourced risky materials have no open mitigation case?</span>
+      <div class="show">Genie calls the trusted function
+      <code class="inline">single_sourced_risky_without_open_case()</code>. The answer has <strong>9 rows</strong>,
+      not 10. The case you just created is already taken into account.</div>
+      <div class="say">"I didn't export anything, and no sync job ran. Unity Catalog reads the Lakebase
+      database <strong>live</strong>, with the same governance as every other table. The question that
+      matters to a purchasing manager is not 'what is at risk', it's <em>'what is at risk and nobody is
+      working on it'</em>. Now Genie can answer it."</div>
+    </li>
+    <li><span class="click-label">ASK</span> a follow-up:
+      <span class="ask">Who owns the open mitigation cases and how long have they been open?</span>
+      <div class="show">Uses <code class="inline">open_mitigation_cases()</code>, which also reads live from Lakebase.</div>
+    </li>
+    <li><span class="click-label">SHOW</span> Catalog Explorer → catalog <code class="inline">sap_purchasing_ops</code>
+      → schema <code class="inline">ops</code> → table <code class="inline">mitigation_case</code>.
+      <div class="say">"Here is the Postgres table, in the same catalog tree as the gold layer. Same
+      permissions model and the same lineage, whether the data lives in Delta or in Postgres."</div>
+    </li>
+  </ol>
+  <div class="tip"><strong>Architecture in one sentence:</strong> Lakehouse computes the worklist (Delta
+  <code class="inline">RISK_WORKLIST</code>) → a <strong>synced table</strong> pushes it into Lakebase → the App
+  writes cases in Lakebase → a <strong>UC catalog over Lakebase</strong> lets Genie read them live → the
+  Lakeflow Job snapshots them into Delta (<code class="inline">MITIGATION_CASE_HISTORY</code>) for trend analysis.</div>
+  <div class="tip">If asked about reverse sync into Delta: Lakebase change data feed into Delta needs a catalog
+  backed by external storage. This demo catalog uses Default Storage, so the history is a snapshot written by
+  the Lakeflow Job instead. Live reads go through the UC catalog.</div>
+
+  <!-- ============================================================ -->
+  <h2 id="lakeflow">12 · Lakeflow Jobs: one orchestrated pipeline keeps it all fresh <span class="clock">5 min · optional</span></h2>
+  <div class="say">"Everything you've seen depends on data being fresh: the gold tables, the metric views,
+  the worklist in Lakebase. Who keeps that running every morning? One Lakeflow Job."</div>
+  <ol class="clicks">
+    <li><span class="click-label">CLICK</span> left nav → <strong>Jobs &amp; Pipelines</strong> → open
+      <strong>sap_purchasing_lakeflow_pipeline</strong> → tab <strong>Tasks</strong>.
+      <div class="show">The task graph. <code class="inline">simulate_raw_sap</code> fans out to
+      <code class="inline">gold_material</code> and <code class="inline">gold_supplier</code> in parallel.
+      Sourcing, supplier risk and purchase orders follow their real dependencies, then everything joins
+      in <code class="inline">constraints_comments</code>.</div>
+      <div class="say">"This is the same pipeline you would otherwise run notebook by notebook. Here the
+      dependencies are explicit. Independent steps run in parallel, on serverless, with no cluster to
+      manage."</div>
+    </li>
+    <li><span class="click-label">POINT</span> at <code class="inline">data_quality_gate</code> and the
+      condition task <code class="inline">dq_passed</code>.
+      <div class="show">The gate checks rows, primary-key uniqueness, NULL keys and the SOURCING → MATERIAL
+      and PO → SUPPLIER relationships. It writes the results to <code class="inline">_DQ_RESULTS</code> and
+      publishes a task value. The condition task only lets the refresh continue when it is
+      <code class="inline">true</code>.</div>
+      <div class="say">"If the SAP extract is broken one morning, the business does not get wrong numbers.
+      The semantic layer and the App simply keep yesterday's good state, and the job shows exactly which
+      check failed."</div>
+    </li>
+    <li><span class="click-label">POINT</span> at the last tasks: <code class="inline">sql_functions</code>,
+      <code class="inline">metric_views</code>, <code class="inline">value_dictionaries</code> and then
+      <code class="inline">sync_lakebase_worklist</code>.
+      <div class="say">"The job doesn't end in a table nobody looks at. It ends where people work: the
+      governed metric views behind Genie and the dashboard, and the Lakebase worklist behind the App."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the tab <strong>Runs</strong> → open the latest run.
+      <div class="show">The timeline (Gantt view) with the duration of each task, the parallel branches,
+      and the job parameters <code class="inline">catalog</code> / <code class="inline">schema</code> /
+      <code class="inline">warehouse_id</code> it ran with.</div>
+    </li>
+    <li><span class="click-label">SHOW</span> the <strong>Schedule &amp; Triggers</strong> panel on the right.
+      <div class="show">A daily schedule at 06:00 Europe/Berlin, created <strong>paused</strong>.</div>
+      <div class="say">"Unpause it and this runs every morning before the buyers start work. Add a
+      notification or a file-arrival trigger in two clicks."</div>
+      <div class="tip">Optionally click <strong>Run now</strong> at the start of the section. The full run takes
+      a few minutes, and you can come back to the live graph at the end.</div>
+    </li>
+  </ol>
+  <div class="say">"One platform: the pipeline, the governed semantics, the AI that answers questions, the
+  operational database where people act, and the app they act in."</div>
 
 </div>
 </body>

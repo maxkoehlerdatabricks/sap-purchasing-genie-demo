@@ -18,8 +18,13 @@ It builds, end-to-end and on a blank workspace:
   glossary) — the ontology layer that Genie One reads.
 - A **benchmark** of representative questions with known-good SQL and an **accuracy
   score**.
-- A **Databricks App** (React + FastAPI) with visualizations + a chat interface over
-  the MAS.
+- A **Databricks App** (React + FastAPI) with visualizations, a chat interface over
+  the MAS, and a **Mitigation cases** tab where buyers act on the risks.
+- A **Lakebase** (managed Postgres) operational layer: the risk worklist is synced from
+  Delta into Lakebase, the App writes mitigation cases there, and a **Unity Catalog
+  catalog over Lakebase** lets Genie read the cases live (closed loop).
+- A multi-task **Lakeflow Job** that refreshes it all: raw → gold → data-quality gate →
+  semantics → Lakebase.
 
 > No Asset Bundles — every notebook runs **manually**. Parameterize **once** in the
 > top-level orchestrator.
@@ -42,6 +47,11 @@ It builds, end-to-end and on a blank workspace:
 
 All 11 are answerable from the **5 gold tables** alone (never the raw tables).
 
+With the Lakebase module, one more question closes the loop between insight and action:
+
+12. Which single-sourced risky materials have **no open mitigation case**? (gold layer +
+    live Lakebase cases, via `single_sourced_risky_without_open_case()`)
+
 ---
 
 ## Architecture & data model
@@ -62,8 +72,45 @@ EKKO, EKPO, EKBE        ─ Workflow E ─▶  PURCHASE_ORDER (EBELN+EBELP)┘
                                     Agent Bricks MAS (serving endpoint)
                                                │
                                        Databricks App
-                                 (Visualizations + Chat)
+                         (Visualizations + Chat + Mitigation cases)
 ```
+
+### Lakebase loop: from insight to action
+
+```
+ Delta RISK_WORKLIST ──(synced table, TRIGGERED)──▶ Lakebase purchasing_ops
+ (single-sourced + risky today)                       purchasing_demo_sync.risk_worklist
+                                                      ops.mitigation_case / case_event   ◀── App writes cases (ms)
+                                                      ops.buyer / ops.action_type        (seed CSVs)
+                                                                │
+          UC catalog sap_purchasing_ops (registered over the Lakebase database, read live)
+                                                                │
+   single_sourced_risky_without_open_case() / open_mitigation_cases()  ──▶ Genie space 1 + MAS
+   Lakeflow Job snapshot ──▶ Delta MITIGATION_CASE_HISTORY
+```
+
+* The worklist is computed in the Lakehouse and pushed to Postgres, so the App reads and
+  writes in milliseconds (foreign keys, CHECK constraints, a partial unique index of one
+  active case per material+plant, and an audit trail).
+* The cases come back to the governed layer **without a copy**: the UC catalog over
+  Lakebase is queried live by the warehouse, so Genie sees a new case immediately.
+* Lakebase change data feed into Delta needs a catalog with external storage. On a
+  Default Storage catalog the Lakeflow Job writes snapshots instead.
+
+### Lakeflow Job: `sap_purchasing_lakeflow_pipeline`
+
+```
+simulate_raw_sap ─┬─ gold_material ─┬─ gold_sourcing ───────┐
+                  └─ gold_supplier ─┼─ gold_supplier_risk ──┼─ constraints_comments ─ data_quality_gate ─ dq_passed? ─(true)─┐
+                                    └─ gold_purchase_order ─┘                                                                │
+            ┌───────────────────────────────┬────────────────────────────────────────────────────────────────────────────────┤
+     sql_functions                    metric_views                                                                   value_dictionaries
+            └───────────────────────────────┴────────────────── sync_lakebase_worklist ───────────────────────────────────────┘
+```
+
+Serverless, parameterized (`catalog`, `schema`, `warehouse_id`), with a data-quality gate
+(`08b`, results in `_DQ_RESULTS`) and a condition task that skips the refresh when a check
+fails. A daily 06:00 schedule is created **paused**.
 
 ### Gold tables (grains)
 | Table | Grain | Built by |
@@ -106,12 +153,18 @@ sap-purchasing-genie-demo/
     07a_benchmark.py                # runs 16 questions vs known-good SQL → accuracy score
     benchmark_questions.yaml
   08_jobs/
-    08a_create_jobs.py              # serverless data-prep Job (Python SDK)
+    08a_create_jobs.py              # multi-task Lakeflow Job (raw → gold → DQ gate → semantics → Lakebase)
+    08b_data_quality_gate.py        # DQ checks on the gold layer; task value for the condition task
   09_domains/
     09a_create_domains.py           # governed tags + Discover domains/subdomains + asset tagging
     09b_create_pages.py             # governed Pages (business glossary) — API or manual
-  app/                              # Databricks App (React + FastAPI)
-  99_teardown.py                    # DELETE every asset (app, job, MAS, Genie, domains, tags, schema)
+  10_lakebase/
+    10a_create_lakebase.py          # Lakebase project, case tables, seed data, UC catalog, case functions
+    10b_sync_worklist.py            # RISK_WORKLIST → Lakebase synced table; cases → MITIGATION_CASE_HISTORY
+    data/buyers.csv                 # seed dataset: 6 buyers (one per material group + lead buyer)
+    data/action_types.csv           # seed dataset: 6 mitigation actions with typical lead times
+  app/                              # Databricks App (FastAPI + static frontend; backend/cases.py = Lakebase)
+  99_teardown.py                    # DELETE every asset (app, jobs, MAS, Genie, Lakebase, domains, tags, schemas)
   demo_script.html                  # comprehensive demo walkthrough
 ```
 
@@ -127,9 +180,9 @@ create Genie spaces + Agent Bricks + serving endpoints + Apps.
 2. **Run `00_run_all`** on **serverless** compute — set the `CATALOG` / `SCHEMA` /
    `WAREHOUSE_ID` Python variables **once** at the top, then Run All. It orchestrates
    everything in order: raw simulation → gold Workflows A–E → constraints/comments →
-   SQL functions → metric views → value dictionary → warehouse & permissions → 2 Genie
-   spaces → MAS + serving endpoint → governed tags + Discover domains →
-    benchmark → serverless Job → Databricks App.
+   SQL functions → metric views → value dictionary → warehouse & permissions →
+   Lakebase (10a + 10b) → 2 Genie spaces → MAS + serving endpoint → benchmark →
+   Databricks App → Lakeflow Job (created and run once) → governed tags + Discover domains.
 
 Each child notebook can still be run individually (it reads the same parameters), but
 `00_run_all` is the single-command path for a full deployment.
@@ -139,11 +192,15 @@ API may not be available on all workspaces. If the API is not exposed, `09b` pro
 manual creation instructions (Discover UI + Genie Code prompts). The page prompts are also
 inlined in `00_run_all` for easy reference.
 
+**Demo reset (Lakebase):** re-running `10_lakebase/10a_create_lakebase` alone resets the
+mitigation cases to the 3 seed cases (10 risks without a case).
+
 ### Teardown
-Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates —
-the App, the data-prep Job, the MAS + serving endpoint, both Genie spaces, and the entire
-schema (`DROP SCHEMA … CASCADE`, which removes all gold/raw tables, metric views, SQL
-functions and the `_*` metadata tables). Set `DELETE_DISCOVER = True` (the default) to also
+Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates:
+the App, the Lakeflow Job (and the legacy data-prep job), the MAS + serving endpoint, both
+Genie spaces, the Lakebase synced table, the UC catalog over Lakebase and the Lakebase
+project (purged), and the schemas `<schema>` and `<schema>_sync` (`DROP SCHEMA … CASCADE`,
+which removes all gold/raw tables, metric views, SQL functions and the `_*` metadata tables). Set `DELETE_DISCOVER = True` (the default) to also
 delete governed Pages, Discover domains, and governed tag policies; set it to `False` to keep
 them. The **catalog** and the **SQL warehouse** are left in place (neither is created by the
 demo). Remove the workspace source folders separately via the Workspace UI or
@@ -168,6 +225,10 @@ the **schema is created**.
 | Genie Space 1 | SAP Purchasing — Sourcing & Supplier Risk |
 | Genie Space 2 | SAP Purchasing — Purchase Order Analytics |
 | MAS endpoint | `sap-purchasing-mas` |
+| Lakebase project / database | `sap-purchasing-ops` / `purchasing_ops` (schema `ops`) |
+| UC catalog over Lakebase | `sap_purchasing_ops` |
+| Sync schema (Delta → Lakebase) | `purchasing_demo_sync` |
+| Lakeflow Job | `sap_purchasing_lakeflow_pipeline` |
 
 ---
 
@@ -179,3 +240,6 @@ the **schema is created**.
 - The MAS endpoint routes a question to the correct Genie space.
 - The benchmark prints a high accuracy score (target ≥ 90%).
 - The App loads: charts render; chat returns MAS answers.
+- The **Mitigation cases** tab lists the 13-row worklist; creating a case drops "risks without
+  an active case" from 10 to 9, and Genie space 1 answers the closed-loop question with 9 rows.
+- The Lakeflow Job run is green, including `data_quality_gate` and `sync_lakebase_worklist`.
