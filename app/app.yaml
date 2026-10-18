@@ -2,7 +2,8 @@
 # Databricks App manifest — SAP Purchasing demo app.
 # Runs a FastAPI backend that (1) serves the built React frontend as static files,
 # (2) queries the gold layer / metric views via the SQL warehouse for the charts,
-# and (3) proxies the chat tab to the MAS serving endpoint (Responses API).
+# (3) proxies the chat tab to the MAS serving endpoint (Responses API), and
+# (4) reads/writes mitigation cases in Lakebase (Postgres) for the cases tab.
 # ============================================================================
 command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
@@ -17,8 +18,17 @@ env:
   # (the endpoint name changes on each recreation).
   - name: MAS_ENDPOINT_NAME
     valueFrom: mas-endpoint
-  # Fully-qualified schema the charts read from.
+  # Fully-qualified schema the charts read from, and the Lakebase coordinates for the
+  # Mitigation cases tab. NOTE: app/deploy_app passes ALL of these as deployment
+  # env_vars from 00_config (overriding this file), so the values below are only
+  # defaults for a manual `databricks apps deploy`.
   - name: DEMO_CATALOG
-    value: "serverless_stable_7qzrfp_catalog"
+    value: "max_kohler_demo_catalog"
   - name: DEMO_SCHEMA
     value: "purchasing_demo"
+  - name: LAKEBASE_DATABASE
+    value: "purchasing_ops"
+  - name: LAKEBASE_SCHEMA
+    value: "ops"
+  - name: LAKEBASE_SYNC_SCHEMA
+    value: "purchasing_demo_sync"

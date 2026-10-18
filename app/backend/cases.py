@@ -5,7 +5,8 @@ writes mitigation cases with plain SQL over a Postgres connection. Every write r
 one transaction together with its audit row in case_event.
 
 Auth: the App's service principal connects as its own Postgres role with a short-lived
-OAuth token from /api/2.0/postgres/credentials (cached, refreshed before expiry).
+OAuth token from /api/2.0/postgres/credentials. Each worker thread keeps its connection
+open and reconnects with a fresh token before the old one expires.
 Connection coordinates are injected by app/deploy_app as environment variables.
 """
 
@@ -13,8 +14,10 @@ import logging
 import os
 import threading
 import time
+from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
+from functools import lru_cache
 from typing import Optional
 
 import psycopg
@@ -35,8 +38,8 @@ LAKEBASE_INFO = {"host": PG_HOST, "database": PG_DATABASE, "ops_schema": OPS, "s
 
 router = APIRouter(prefix="/api/cases")
 
-_token_lock = threading.Lock()
-_token = {"value": None, "expires": 0.0}
+_local = threading.local()
+_MAX_CONN_AGE = 40 * 60  # OAuth tokens live 1h; reconnect with a fresh one well before that
 
 
 def _ws():
@@ -44,24 +47,38 @@ def _ws():
     return main_ws()
 
 
-def _pg_token() -> str:
-    """Return a cached Postgres OAuth token, minting a new one every 40 minutes."""
-    with _token_lock:
-        if _token["value"] and time.time() < _token["expires"]:
-            return _token["value"]
-        res = _ws().api_client.do("POST", "/api/2.0/postgres/credentials", body={"endpoint": PG_ENDPOINT})
-        _token["value"], _token["expires"] = res["token"], time.time() + 40 * 60
-        return _token["value"]
-
-
+@lru_cache(maxsize=1)
 def _pg_user() -> str:
     # In the App runtime this is the service principal's client id (its Postgres role).
     return os.environ.get("DATABRICKS_CLIENT_ID") or _ws().current_user.me().user_name
 
 
-def _connect():
-    return psycopg.connect(host=PG_HOST, dbname=PG_DATABASE, user=_pg_user(), password=_pg_token(),
+def _new_connection():
+    token = _ws().api_client.do("POST", "/api/2.0/postgres/credentials", body={"endpoint": PG_ENDPOINT})["token"]
+    return psycopg.connect(host=PG_HOST, dbname=PG_DATABASE, user=_pg_user(), password=token,
                            sslmode="require", row_factory=dict_row, connect_timeout=15)
+
+
+@contextmanager
+def _connect():
+    """Yield this worker thread's Postgres connection inside one transaction.
+
+    The connection is kept open between requests (so a query costs milliseconds, not a
+    TLS handshake) and replaced when it is broken or its token is about to expire.
+    """
+    conn, born = getattr(_local, "conn", None), getattr(_local, "born", 0.0)
+    if conn is None or conn.closed or conn.broken or time.time() - born > _MAX_CONN_AGE:
+        if conn is not None and not conn.closed:
+            conn.close()
+        conn = _local.conn = _new_connection()
+        _local.born = time.time()
+    try:
+        with conn.transaction():
+            _local.ready = time.perf_counter()
+            yield conn
+    except psycopg.OperationalError:
+        conn.close()
+        raise
 
 
 def _q(text: str) -> sql.Composed:
@@ -88,9 +105,9 @@ def _actor(request: Request) -> str:
 
 
 def _timed(fn):
-    t0 = time.perf_counter()
+    """Run fn and return (result, ms spent in Postgres after the connection was ready)."""
     out = fn()
-    return out, round((time.perf_counter() - t0) * 1000, 1)
+    return out, round((time.perf_counter() - _local.ready) * 1000, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +217,7 @@ def create_case(body: NewCase, request: Request):
 
     def run():
         with _connect() as c:
-            with c.transaction(), c.cursor() as cur:
+            with c.cursor() as cur:
                 cur.execute(_q("""SELECT "LIFNR" AS lifnr, "RISK_SCORE" AS risk_score FROM {sync}.risk_worklist
                                   WHERE "MATNR" = %s AND "WERKS" = %s"""), (body.matnr, body.werks))
                 wl = cur.fetchone()
@@ -236,7 +253,7 @@ def update_case(case_id: int, body: CaseUpdate, request: Request):
 
     def run():
         with _connect() as c:
-            with c.transaction(), c.cursor() as cur:
+            with c.cursor() as cur:
                 cur.execute(_q("SELECT status, buyer_id FROM {ops}.mitigation_case WHERE case_id = %s FOR UPDATE"), (case_id,))
                 cur_row = cur.fetchone()
                 if not cur_row:

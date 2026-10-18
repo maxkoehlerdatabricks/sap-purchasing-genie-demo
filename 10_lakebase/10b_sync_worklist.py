@@ -106,9 +106,10 @@ def get_synced():
 
 
 st = get_synced()
-# A synced table left over from a purged project (or a failed one) can never come
-# online again, so recreate it.
-if st and (st.get("spec", {}).get("branch") != BRANCH or "FAILED" in st.get("status", {}).get("detailed_state", "")):
+# A synced table pointing at another project (or a failed one) can never come online
+# again, so recreate it. (GET returns the project under status, not the spec.)
+if st and (st.get("status", {}).get("project") != f"projects/{CFG.lakebase_project}"
+           or "FAILED" in st.get("status", {}).get("detailed_state", "")):
     print(f"  · removing stale synced table ({st.get('status', {}).get('detailed_state')})")
     _do("DELETE", f"/api/2.0/postgres/synced_tables/{SYNCED_ID}")
     time.sleep(10)

@@ -40,6 +40,25 @@
     .composer { display:flex; gap:8px; margin-top:12px; }
     .composer input { flex:1; padding:10px 12px; border:1px solid #dbe3e7; border-radius:8px; font-size:14px; }
     .composer button { background:var(--db-red); color:#fff; border:none; border-radius:8px; padding:10px 20px; cursor:pointer; }
+    .cases-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+    .cases-head h3 { margin:0; font-size:15px; }
+    .badge-lb { font-size:11px; background:#e6f6ef; color:#00734d; border-radius:10px; padding:3px 9px; font-weight:600; }
+    table.wl { width:100%; border-collapse:collapse; font-size:13px; }
+    table.wl th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:#8a9aa2; padding:6px 8px; border-bottom:1px solid #e4e9ec; }
+    table.wl td { padding:7px 8px; border-bottom:1px solid #f0f3f5; vertical-align:middle; }
+    table.wl tr.has-case td { color:#8a9aa2; }
+    .score { display:inline-block; min-width:32px; text-align:center; border-radius:6px; padding:2px 6px; font-weight:700; color:#fff; background:var(--db-red); }
+    .score.mid { background:#FFAB00; }
+    .st { display:inline-block; border-radius:10px; padding:2px 8px; font-size:11px; font-weight:600; }
+    .st.OPEN { background:#fdeeec; color:#c22a17; } .st.IN_PROGRESS { background:#fff4d6; color:#9a6a00; }
+    .st.DONE { background:#e6f6ef; color:#00734d; } .st.CANCELLED { background:#eef2f4; color:#5a6b74; }
+    .btn { background:var(--db-navy); color:#fff; border:none; border-radius:6px; padding:5px 10px; font-size:12px; cursor:pointer; }
+    .btn.red { background:var(--db-red); } .btn.ghost { background:#eef2f4; color:#1B3139; }
+    .btn:disabled { opacity:.5; cursor:default; }
+    .form-row td { background:#f8fafb; }
+    .form-row select, .form-row input { padding:5px 7px; border:1px solid #dbe3e7; border-radius:6px; font-size:12px; margin-right:6px; }
+    .toast { position:fixed; bottom:20px; right:20px; background:var(--db-navy); color:#fff; padding:10px 16px; border-radius:8px; font-size:13px; display:none; box-shadow:0 4px 14px rgba(0,0,0,.2); }
+    .events { font-size:12px; color:#5a6b74; margin:4px 0 0; padding-left:16px; }
     footer { margin-top:24px; text-align:center; font-size:11px; color:#a4b1b8; }
     canvas { max-height:280px; }
   </style>
@@ -51,6 +70,7 @@
       <nav>
         <button id="tab-viz" class="active" onclick="showTab('viz')">Visualizations</button>
         <button id="tab-chat" onclick="showTab('chat')">Chat (MAS)</button>
+        <button id="tab-cases" onclick="showTab('cases')">Mitigation cases (Lakebase)</button>
       </nav>
     </header>
     <main>
@@ -73,8 +93,30 @@
           </div>
         </div>
       </section>
+      <section id="cases" style="display:none">
+        <div class="kpis" id="case-kpis"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="cases-head">
+            <h3>Risk worklist: single-sourced materials whose sole supplier is at delivery risk</h3>
+            <span class="badge-lb" id="wl-latency">Lakebase</span>
+          </div>
+          <p class="sub">Computed in the Lakehouse (RISK_WORKLIST), synced to Lakebase. Open a case to act on a risk.</p>
+          <table class="wl"><thead><tr><th>Material</th><th>Plant</th><th>Sole supplier</th><th>Risk</th><th>Open POs</th><th>Case</th><th></th></tr></thead>
+            <tbody id="wl-body"></tbody></table>
+        </div>
+        <div class="card">
+          <div class="cases-head">
+            <h3>Cases</h3>
+            <div>Buyer: <select id="buyer-filter" onchange="loadCases()"><option value="">All buyers</option></select>
+              <span class="badge-lb" id="cases-latency">Lakebase</span></div>
+          </div>
+          <table class="wl"><thead><tr><th>#</th><th>Material</th><th>Action</th><th>Buyer</th><th>Priority</th><th>Due</th><th>Status</th><th></th></tr></thead>
+            <tbody id="cases-body"></tbody></table>
+        </div>
+      </section>
     </main>
-    <footer>Powered by Databricks Genie · Agent Bricks Multi-Agent Supervisor · Unity Catalog metric views</footer>
+    <div class="toast" id="toast"></div>
+    <footer>Powered by Databricks Genie · Agent Bricks Multi-Agent Supervisor · Unity Catalog metric views · Lakebase</footer>
   </div>
 
 <script>
@@ -82,10 +124,11 @@ const COLORS = ["#FF3621","#1B3139","#00A972","#FFAB00","#2272B4","#8BCAE7","#E6
 const j = (p, o) => fetch(p, o).then(r => r.json());
 
 function showTab(t){
-  document.getElementById('viz').style.display = t==='viz'?'block':'none';
-  document.getElementById('chat').style.display = t==='chat'?'block':'none';
-  document.getElementById('tab-viz').className = t==='viz'?'active':'';
-  document.getElementById('tab-chat').className = t==='chat'?'active':'';
+  for (const id of ['viz','chat','cases']) {
+    document.getElementById(id).style.display = t===id?'block':'none';
+    document.getElementById('tab-'+id).className = t===id?'active':'';
+  }
+  if (t==='cases') loadCasesTab();
 }
 
 function bar(id, rows, labelKey, valKey){
@@ -144,6 +187,112 @@ async function send(text){
 }
 document.getElementById('samples').innerHTML='';
 SAMPLES.forEach(s=>{ const b=document.createElement('button'); b.textContent=s; b.onclick=()=>send(s); document.getElementById('samples').appendChild(b); });
+
+// ---------------- Mitigation cases (Lakebase) ----------------
+let META = {buyers:[], actions:[]}, OPEN_FORM = null;
+const esc = v => String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const label = code => (META.actions.find(a=>a.action_code===code)||{}).label || code;
+const buyerName = id => (META.buyers.find(b=>b.buyer_id===id)||{}).full_name || id;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none', 3500); }
+async function api(path, opts){
+  const r = await fetch(path, opts); const body = await r.json().catch(()=>({}));
+  if (!r.ok) throw new Error(body.detail || r.statusText); return body;
+}
+
+async function loadCasesTab(){
+  if (!META.buyers.length) {
+    META = await api('/api/cases/meta');
+    const sel = document.getElementById('buyer-filter');
+    META.buyers.forEach(b => sel.insertAdjacentHTML('beforeend', `<option value="${b.buyer_id}">${esc(b.full_name)} (${esc(b.material_group)})</option>`));
+  }
+  await Promise.all([loadSummary(), loadWorklist(), loadCases()]);
+}
+
+async function loadSummary(){
+  const k = await api('/api/cases/summary');
+  const cards = [
+    {l:"Risks without an active case", v:k.unmitigated, t:"bad"},
+    {l:"On the risk worklist", v:k.worklist, t:"warn"},
+    {l:"Open cases", v:k.open, t:"warn"},
+    {l:"In progress", v:k.in_progress, t:"ok"},
+    {l:"Done", v:k.done, t:"ok"},
+  ];
+  document.getElementById('case-kpis').innerHTML = cards.map(c=>
+    `<div class="kpi ${c.t}"><div class="kpi-value">${c.v}</div><div class="kpi-label">${c.l}</div></div>`).join('');
+}
+
+async function loadWorklist(){
+  const res = await api('/api/cases/worklist');
+  document.getElementById('wl-latency').textContent = `Lakebase · ${res.rows.length} rows in ${res.elapsed_ms} ms`;
+  const body = document.getElementById('wl-body'); body.innerHTML = '';
+  res.rows.forEach(r => {
+    const key = r.matnr + '|' + r.werks;
+    const caseCell = r.case_id ? `<span class="st ${r.status}">#${r.case_id} ${r.status.replace('_',' ')}</span> ${esc(label(r.action_code))}` : '<span style="color:#c22a17">No case</span>';
+    body.insertAdjacentHTML('beforeend', `<tr class="${r.case_id?'has-case':''}">
+      <td><b>${esc(r.matnr)}</b><br><span style="font-size:11px;color:#8a9aa2">${esc(r.maktx)} · ${esc(r.matkl)}</span></td>
+      <td>${esc(r.werks)}</td>
+      <td>${esc(r.lifnr)}<br><span style="font-size:11px;color:#8a9aa2">${esc(r.supplier_name)} (${esc(r.country)})</span></td>
+      <td><span class="score ${r.risk_score<80?'mid':''}">${r.risk_score}</span> <span style="font-size:11px">${esc(r.risk_category)}</span></td>
+      <td>${r.open_po_lines}</td>
+      <td>${caseCell}</td>
+      <td>${r.case_id ? '' : `<button class="btn red" onclick="toggleForm('${key}')">Open case</button>`}</td></tr>`);
+    if (OPEN_FORM === key) body.insertAdjacentHTML('beforeend', formRow(r));
+  });
+}
+
+function formRow(r){
+  const defBuyer = (META.buyers.find(b=>b.material_group===r.matkl)||META.buyers[META.buyers.length-1]).buyer_id;
+  const actions = META.actions.map(a=>`<option value="${a.action_code}">${esc(a.label)}</option>`).join('');
+  const buyers = META.buyers.map(b=>`<option value="${b.buyer_id}" ${b.buyer_id===defBuyer?'selected':''}>${esc(b.full_name)}</option>`).join('');
+  return `<tr class="form-row"><td colspan="7">
+    <select id="f-action">${actions}</select>
+    <select id="f-buyer">${buyers}</select>
+    <select id="f-prio"><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option></select>
+    <input id="f-note" placeholder="Note (optional)" style="width:260px">
+    <button class="btn red" onclick="createCase('${esc(r.matnr)}','${esc(r.werks)}')">Create case</button>
+    <button class="btn ghost" onclick="toggleForm(null)">Cancel</button></td></tr>`;
+}
+function toggleForm(key){ OPEN_FORM = (OPEN_FORM===key? null : key); loadWorklist(); }
+
+async function createCase(matnr, werks){
+  try {
+    const res = await api('/api/cases', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      matnr, werks, action_code: document.getElementById('f-action').value, buyer_id: document.getElementById('f-buyer').value,
+      priority: document.getElementById('f-prio').value, note: document.getElementById('f-note').value || null})});
+    toast(`Case #${res.case_id} created in Lakebase (${res.elapsed_ms} ms)`);
+    OPEN_FORM = null; await Promise.all([loadSummary(), loadWorklist(), loadCases()]);
+  } catch(e){ toast('Could not create case: ' + e.message); }
+}
+
+const NEXT = {OPEN:[['IN_PROGRESS','Start'],['CANCELLED','Cancel']], IN_PROGRESS:[['DONE','Mark done'],['CANCELLED','Cancel']], DONE:[], CANCELLED:[]};
+async function loadCases(){
+  const buyer = document.getElementById('buyer-filter').value;
+  const res = await api('/api/cases' + (buyer ? `?buyer_id=${buyer}` : ''));
+  document.getElementById('cases-latency').textContent = `Lakebase · ${res.rows.length} cases in ${res.elapsed_ms} ms`;
+  document.getElementById('cases-body').innerHTML = res.rows.map(c => `<tr>
+    <td>${c.case_id}</td>
+    <td><b>${esc(c.matnr)}</b> / ${esc(c.werks)}<br><span style="font-size:11px;color:#8a9aa2">${esc(c.maktx||'')}</span></td>
+    <td>${esc(c.action_label)}${c.note?`<br><span style="font-size:11px;color:#8a9aa2">${esc(c.note)}</span>`:''}</td>
+    <td>${esc(c.buyer_name)}</td><td>${c.priority}</td><td>${c.due_date||''}</td>
+    <td><span class="st ${c.status}">${c.status.replace('_',' ')}</span></td>
+    <td style="white-space:nowrap">${NEXT[c.status].map(([s,l])=>`<button class="btn ${s==='CANCELLED'?'ghost':''}" onclick="setStatus(${c.case_id},'${s}')">${l}</button>`).join(' ')}
+      <button class="btn ghost" onclick="showEvents(this, ${c.case_id})">History</button></td></tr>`).join('')
+    || '<tr><td colspan="8" style="color:#8a9aa2">No cases for this buyer yet.</td></tr>';
+}
+
+async function setStatus(id, status){
+  try {
+    const res = await api(`/api/cases/${id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status})});
+    toast(`Case #${id} → ${status.replace('_',' ')} (${res.elapsed_ms} ms)`);
+    await Promise.all([loadSummary(), loadWorklist(), loadCases()]);
+  } catch(e){ toast('Update failed: ' + e.message); }
+}
+
+async function showEvents(btn, id){
+  const td = btn.parentElement; const old = td.querySelector('.events'); if (old) { old.remove(); return; }
+  const ev = await api(`/api/cases/${id}/events`);
+  td.insertAdjacentHTML('beforeend', `<ul class="events">${ev.map(e=>`<li>${e.created_at.slice(0,16).replace('T',' ')} · ${esc(e.event_type)}${e.to_status?' → '+e.to_status:''} · ${esc(e.actor)}</li>`).join('')}</ul>`);
+}
 
 loadViz();
 </script>
