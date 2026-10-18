@@ -54,7 +54,9 @@ agents = [
         "name": "Sourcing_Supplier_Risk",
         "description": ("Answers sourcing-risk and supply-continuity questions: "
                         "multi-sourcing gaps, single-sourced materials, supplier "
-                        "delivery risk, purchasing blocks, and quota concentration."),
+                        "delivery risk, purchasing blocks, quota concentration, and the "
+                        "live mitigation cases buyers opened on those risks (open cases, "
+                        "risks nobody is working on yet)."),
         "agent_type": "genie",
         "genie_space": {"id": S1},
     },

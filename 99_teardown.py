@@ -13,7 +13,8 @@
 # MAGIC
 # MAGIC ## What it deletes
 # MAGIC 1. **Databricks App** — `sap-purchasing-app`.
-# MAGIC 2. **Data-prep Job** — `sap_purchasing_data_prep`.
+# MAGIC 2. **Lakeflow Job** — `sap_purchasing_lakeflow_pipeline` (and the earlier
+# MAGIC    single-task job `sap_purchasing_data_prep`, if still present).
 # MAGIC 3. **Multi-Agent Supervisor (MAS)** + its **serving endpoint** (looked up from
 # MAGIC    `_MAS_ENDPOINT`, falling back to the tiles API by name).
 # MAGIC 4. **Genie spaces** — both, looked up from `_GENIE_SPACES`, falling back to the
@@ -21,8 +22,12 @@
 # MAGIC 5. **Discover pages, domains & governed tags** *(optional, controlled by
 # MAGIC    `DELETE_DISCOVER`)* — deletes all 5 governed pages, the 3 domains/subdomains,
 # MAGIC    and the 3 governed tag policies.
-# MAGIC 6. **The whole schema** `catalog.schema` (all gold + raw + metric views + SQL
-# MAGIC    functions + the `_*` metadata tables) via `DROP SCHEMA ... CASCADE`.
+# MAGIC 6. **Lakebase** — the synced table, the UC catalog `sap_purchasing_ops` over the
+# MAGIC    database, and the Lakebase project `sap-purchasing-ops` (purged, so the name can
+# MAGIC    be reused at once). This deletes all mitigation cases.
+# MAGIC 7. **The whole schema** `catalog.schema` (all gold + raw + metric views + SQL
+# MAGIC    functions + the `_*` metadata tables) and the sync schema `<schema>_sync`
+# MAGIC    via `DROP SCHEMA ... CASCADE`.
 # MAGIC
 # MAGIC ## What it does NOT delete (intentionally)
 # MAGIC * The **catalog** — taken as-is, never created by the demo.
@@ -47,7 +52,7 @@ SCHEMA = "purchasing_demo"                       # Schema created by the demo (w
 # Asset names (must match 00_config.py).
 MAS_NAME = "sap_purchasing_supervisor"
 APP_NAME = "sap-purchasing-app"
-JOB_NAME = "sap_purchasing_data_prep"
+JOB_NAMES = ["sap_purchasing_lakeflow_pipeline", "sap_purchasing_data_prep"]  # current + legacy
 GENIE_SPACE_1_NAME = "SAP Purchasing — Sourcing & Supplier Risk"
 GENIE_SPACE_2_NAME = "SAP Purchasing — Purchase Order Analytics"
 
@@ -60,6 +65,11 @@ PARENT_TAG = "SAP_Purchasing"
 SUB_TAG_1 = f"{PARENT_TAG}/Sourcing_Supplier_Risk"
 SUB_TAG_2 = f"{PARENT_TAG}/Purchase_Order_Analytics"
 DISCOVER_TAG_KEYS = [SUB_TAG_1, SUB_TAG_2, PARENT_TAG]  # delete children first
+
+# Lakebase (must match 00_config.py).
+LAKEBASE_PROJECT = "sap-purchasing-ops"
+LAKEBASE_CATALOG = "sap_purchasing_ops"
+SYNC_SCHEMA = f"{SCHEMA}_sync"
 
 # Page names (must match 09b_create_pages).
 PAGE_NAMES = [
@@ -112,20 +122,21 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2) Delete the data-prep Job
+# MAGIC ## 2) Delete the Lakeflow Job (and the legacy data-prep job)
 
 # COMMAND ----------
 
-try:
-    jobs = list(w.jobs.list(name=JOB_NAME))
-    if not jobs:
-        print(f"  (job '{JOB_NAME}' not found)")
-    for j in jobs:
-        print(f"Deleting job '{JOB_NAME}' (job_id={j.job_id})…")
-        w.jobs.delete(job_id=j.job_id)
-        print("  ✓ job deleted")
-except Exception as e:
-    print(f"  (could not delete job '{JOB_NAME}': {e})")
+for job_name in JOB_NAMES:
+    try:
+        jobs = list(w.jobs.list(name=job_name))
+        if not jobs:
+            print(f"  (job '{job_name}' not found)")
+        for j in jobs:
+            print(f"Deleting job '{job_name}' (job_id={j.job_id})…")
+            w.jobs.delete(job_id=j.job_id)
+            print("  ✓ job deleted")
+    except Exception as e:
+        print(f"  (could not delete job '{job_name}': {e})")
 
 # COMMAND ----------
 
@@ -360,18 +371,53 @@ else:
 
 # DBTITLE 1,Step 6 heading
 # MAGIC %md
-# MAGIC ## 6) Drop the whole schema (tables, views, functions, metadata)
+# MAGIC ## 6) Delete Lakebase: synced table → UC catalog → project (purged)
+# MAGIC In dependency order. The synced table goes first (its pipeline writes into the
+# MAGIC project), then the catalog registration, then the project with `purge=true`. A plain
+# MAGIC delete only soft-deletes and blocks re-creating the same project name.
+
+# COMMAND ----------
+
+# DBTITLE 1,Delete Lakebase assets
+import time
+
+synced_id = f"{CATALOG}.{SYNC_SCHEMA}.risk_worklist"
+try:
+    _do("DELETE", f"/api/2.0/postgres/synced_tables/{synced_id}")
+    print(f"  ✓ deleted synced table {synced_id}")
+    time.sleep(10)
+except Exception as e:
+    print(f"  (synced table {synced_id} not found: {str(e)[:80]})")
+
+try:
+    _do("DELETE", f"/api/2.0/postgres/catalogs/{LAKEBASE_CATALOG}")
+    print(f"  ✓ deleted UC catalog {LAKEBASE_CATALOG}")
+except Exception as e:
+    print(f"  (UC catalog {LAKEBASE_CATALOG} not found: {str(e)[:80]})")
+
+try:
+    _do("DELETE", f"/api/2.0/postgres/projects/{LAKEBASE_PROJECT}", params={"purge": "true"})
+    print(f"  ✓ deleted and purged Lakebase project {LAKEBASE_PROJECT}")
+except Exception as e:
+    print(f"  (Lakebase project {LAKEBASE_PROJECT} not found: {str(e)[:80]})")
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 7 heading
+# MAGIC %md
+# MAGIC ## 7) Drop the whole schema (tables, views, functions, metadata)
 # MAGIC `DROP SCHEMA ... CASCADE` removes all 5 gold tables, the 13 raw tables, the 4
 # MAGIC metric views, all SQL functions, `VALUE_DICTIONARY`, and the `_GENIE_SPACES` /
 # MAGIC `_MAS_ENDPOINT` / `_BENCHMARK_RESULTS` metadata tables in one shot.
 
 # COMMAND ----------
 
-try:
-    spark.sql(f"DROP SCHEMA IF EXISTS {NS} CASCADE")
-    print(f"  ✓ dropped schema {NS} (CASCADE)")
-except Exception as e:
-    print(f"  (could not drop schema {NS}: {e})")
+for ns in (f"{CATALOG}.{SYNC_SCHEMA}", NS):
+    try:
+        spark.sql(f"DROP SCHEMA IF EXISTS {ns} CASCADE")
+        print(f"  ✓ dropped schema {ns} (CASCADE)")
+    except Exception as e:
+        print(f"  (could not drop schema {ns}: {e})")
 
 # COMMAND ----------
 

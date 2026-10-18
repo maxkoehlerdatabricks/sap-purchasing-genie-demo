@@ -7,7 +7,8 @@
 # MAGIC awareness — everything an analyst needs to demo natural-language querying.
 # MAGIC
 # MAGIC * **Space 1 — Sourcing & Supplier Risk:** MATERIAL, SUPPLIER, SOURCING,
-# MAGIC   SUPPLIER_RISK, VALUE_DICTIONARY + `mv_sourcing_coverage`, `mv_supplier_risk`.
+# MAGIC   SUPPLIER_RISK, VALUE_DICTIONARY, RISK_WORKLIST + `mv_sourcing_coverage`,
+# MAGIC   `mv_supplier_risk`, plus the live Lakebase case functions from `10a`.
 # MAGIC * **Space 2 — Purchase Order Analytics:** PURCHASE_ORDER, MATERIAL, SUPPLIER,
 # MAGIC   SUPPLIER_RISK, VALUE_DICTIONARY + `mv_delivery_performance`, `mv_price_analytics`.
 # MAGIC
@@ -121,6 +122,10 @@ s1_tables = [
     CFG.fq("SUPPLIER_RISK"), CFG.fq("VALUE_DICTIONARY"),
     CFG.fq("mv_sourcing_coverage"), CFG.fq("mv_supplier_risk"),
 ]
+# Lakebase loop (10a/10b): the risk worklist table and the case functions, when present.
+HAS_CASES = spark.catalog.functionExists(CFG.fq("single_sourced_risky_without_open_case"))
+if spark.catalog.tableExists(CFG.fq("RISK_WORKLIST")):
+    s1_tables.append(CFG.fq("RISK_WORKLIST"))
 s1_desc = (
     "SAP purchasing — Sourcing & Supplier Risk. Answers sourcing-risk and "
     "supply-continuity questions: multi-sourcing gaps, single-sourced materials, "
@@ -147,6 +152,15 @@ add_text(s1, "Value dictionary",
     "Use the VALUE_DICTIONARY table (DOMAIN, CODE, LABEL) to translate business words to "
     "codes: 'raw material'->MTART='ROH', 'blocked vendor'->SPERM='X', "
     "'delivery risk'->DELIVERY_RISK_FLAG='X'.")
+
+if HAS_CASES:
+    add_text(s1, "Mitigation cases (live from Lakebase)",
+        "Buyers act on sourcing risks by opening mitigation cases in the App; the cases live in "
+        "Lakebase and are read live. A case is ACTIVE when status is OPEN or IN_PROGRESS. "
+        "'Unmitigated', 'no action', 'nobody working on it' or 'without a case' = a single-sourced, "
+        "currently risky material+plant with no active case: use single_sourced_risky_without_open_case(). "
+        "For the cases themselves (who owns what, how long open) use open_mitigation_cases(). "
+        "RISK_WORKLIST is the daily snapshot of single-sourced risky materials with descriptions.")
 
 # ---- 2) SQL_INSTRUCTIONS (add SECOND: joins/examples) ----
 add_sql(s1, "Join SOURCING to MATERIAL",
@@ -177,6 +191,9 @@ for fn in ["materials_without_multisourcing_default",    # Q1 no-arg wrapper (th
            "suppliers_multi_material_group",              # no arg
            "materials_without_valid_sourcing"]:           # no arg
     add_function(s1, f"{NS}.{fn}")
+if HAS_CASES:
+    for fn in ["single_sourced_risky_without_open_case", "open_mitigation_cases"]:
+        add_function(s1, f"{NS}.{fn}")
 
 # ---- Sample questions (shown in UI) ----
 for q in [
@@ -188,7 +205,7 @@ for q in [
     "Which materials have quota arrangements where one vendor holds over 80% of quota?",
     "Which suppliers provide materials across more than one material group?",
     "Which materials have no valid sourcing record at all?",
-]:
+] + (["Which single-sourced risky materials have no open mitigation case?"] if HAS_CASES else []):
     add_sample_question(s1, q)
 
 print(f"✓ Space 1 fully configured: {s1}")

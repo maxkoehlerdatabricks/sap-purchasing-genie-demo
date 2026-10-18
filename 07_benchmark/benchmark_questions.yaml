@@ -108,3 +108,9 @@
   known_good_sql: "SELECT s.LAND1, COUNT(DISTINCT r.LIFNR) c FROM SUPPLIER_RISK r JOIN SUPPLIER s ON r.LIFNR=s.LIFNR WHERE r.DELIVERY_RISK_FLAG='X' GROUP BY s.LAND1 ORDER BY c DESC LIMIT 1"
   signature: rowcount
   space: sourcing_supplier_risk
+
+- id: QL1
+  question: "Which single-sourced materials with a risky sole supplier have no open mitigation case?"
+  known_good_sql: "SELECT MATNR, WERKS FROM single_sourced_risky_without_open_case()"
+  signature: rowcount
+  space: sourcing_supplier_risk

@@ -21,13 +21,15 @@
 # MAGIC 3. `02_build_gold/02f_constraints_comments` — PK/FK + column/table comments.
 # MAGIC 4. `03_semantics/03a..03c`            — SQL functions, metric views, value dicts.
 # MAGIC 5. `04_resources/04a_resources`       — ensure warehouse + grant UC permissions.
-# MAGIC 6. `05_genie/05a_create_genie_spaces` — create the 2 Genie spaces + instructions.
-# MAGIC 7. `06_agent/06a_create_mas`          — create the Agent Bricks MAS + endpoint.
-# MAGIC 8. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
-# MAGIC 9. `08_jobs/08a_create_jobs`          — register the serverless data-prep Job.
-# MAGIC 10. `app/deploy_app`                   — create & deploy the Databricks App.
-# MAGIC 11. `09_domains/09a_create_domains`    — create governed tags, Discover domains & subdomains.
-# MAGIC     `09_domains/09b_create_pages`      — create governed Pages (**commented out** — Pages API not yet available).
+# MAGIC 6. `10_lakebase/10a_create_lakebase`  — Lakebase project, case tables, seed data, UC catalog, case functions.
+# MAGIC    `10_lakebase/10b_sync_worklist`    — RISK_WORKLIST → Lakebase synced table; case snapshot → Delta.
+# MAGIC 7. `05_genie/05a_create_genie_spaces` — create the 2 Genie spaces + instructions (incl. case functions).
+# MAGIC 8. `06_agent/06a_create_mas`          — create the Agent Bricks MAS + endpoint.
+# MAGIC 9. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
+# MAGIC 10. `app/deploy_app`                  — create & deploy the Databricks App (charts, chat, cases).
+# MAGIC 11. `08_jobs/08a_create_jobs`         — register the multi-task Lakeflow Job and run it once.
+# MAGIC 12. `09_domains/09a_create_domains`   — create governed tags, Discover domains & subdomains.
+# MAGIC     `09_domains/09b_create_pages`     — create governed Pages (**commented out** — Pages API not yet available).
 # MAGIC
 # MAGIC ## What it does NOT run
 # MAGIC * `99_teardown` — destructive cleanup (deletes everything). Run manually when needed.
@@ -164,9 +166,25 @@ run_child("./04_resources/04a_resources")
 
 # COMMAND ----------
 
-# DBTITLE 1,Step 6 — Genie spaces & MAS
+# DBTITLE 1,Step 6 — Lakebase
 # MAGIC %md
-# MAGIC ## 6) Create the 2 Genie spaces + Agent Bricks MAS
+# MAGIC ## 6) Lakebase — the operational layer for mitigation cases
+# MAGIC `10a` creates the Lakebase project, the case tables with seed data and the UC catalog
+# MAGIC over Lakebase (and resets the cases to the demo seed state). `10b` builds the
+# MAGIC `RISK_WORKLIST` and syncs it into Lakebase for the App. Runs before Genie, so space 1
+# MAGIC can register the live case functions.
+
+# COMMAND ----------
+
+# DBTITLE 1,Run 10a + 10b
+run_child("./10_lakebase/10a_create_lakebase")   # project, schema, seed data, UC catalog, functions
+run_child("./10_lakebase/10b_sync_worklist")     # Delta worklist -> Lakebase synced table
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 7 — Genie spaces & MAS
+# MAGIC %md
+# MAGIC ## 7) Create the 2 Genie spaces + Agent Bricks MAS
 # MAGIC Genie spaces must exist before the MAS, and the MAS waits for its serving
 # MAGIC endpoint to reach READY (may take a few minutes).
 
@@ -178,24 +196,36 @@ run_child("./06_agent/06a_create_mas")            # Agent Bricks MAS + serving e
 
 # COMMAND ----------
 
-# DBTITLE 1,Step 7 — Benchmark, Job & App
+# DBTITLE 1,Step 8 — Benchmark & App
 # MAGIC %md
-# MAGIC ## 7) Benchmark, serverless Job & App deployment
+# MAGIC ## 8) Benchmark & App deployment
 # MAGIC Benchmark validates accuracy against known-good SQL (and optionally queries the
-# MAGIC MAS). The Job wraps `00_run_all` for scheduled re-runs. The App is deployed last.
+# MAGIC MAS). The App gets the charts, the MAS chat and the Lakebase cases tab.
 
 # COMMAND ----------
 
-# DBTITLE 1,Run 07a + 08a + deploy_app
+# DBTITLE 1,Run 07a + deploy_app
 run_child("./07_benchmark/07a_benchmark")    # accuracy benchmark
-run_child("./08_jobs/08a_create_jobs")       # serverless data-prep Job
-run_child("./app/deploy_app")               # Databricks App (React + FastAPI)
+run_child("./app/deploy_app")               # Databricks App (React + FastAPI + Lakebase)
 
 # COMMAND ----------
 
-# DBTITLE 1,Step 8 — Discover domains
+# DBTITLE 1,Step 9 — Lakeflow Job
 # MAGIC %md
-# MAGIC ## 8) Create Discover domains & subdomains (tags + asset tagging + publish)
+# MAGIC ## 9) Lakeflow Job — the same pipeline as an orchestrated task graph
+# MAGIC Registers the multi-task job (raw → gold → DQ gate → semantics → Lakebase) and
+# MAGIC runs it once, so the demo has a completed run to show.
+
+# COMMAND ----------
+
+# DBTITLE 1,Run 08a
+run_child("./08_jobs/08a_create_jobs", timeout=7200)  # create + run the Lakeflow job
+
+# COMMAND ----------
+
+# DBTITLE 1,Step 10 — Discover domains
+# MAGIC %md
+# MAGIC ## 10) Create Discover domains & subdomains (tags + asset tagging + publish)
 # MAGIC Organises gold tables, metric views, functions, and Genie spaces into a
 # MAGIC business-aligned hierarchy on the Discover page.
 # MAGIC
@@ -549,11 +579,12 @@ displayHTML("""
 # DBTITLE 1,Cell 14
 # MAGIC %md
 # MAGIC ## Done — full deployment complete
-# MAGIC All data, semantics, Genie spaces, MAS endpoint, Discover domains & Pages,
-# MAGIC benchmark, Job, and App have been deployed. Run `99_teardown` to clean up
+# MAGIC All data, semantics, Lakebase (cases + synced worklist + UC catalog), Genie
+# MAGIC spaces, MAS endpoint, benchmark, App, the Lakeflow Job (with one completed run)
+# MAGIC and Discover domains have been deployed. Run `99_teardown` to clean up
 # MAGIC when you're done.
 
 # COMMAND ----------
 
 # DBTITLE 1,Cell 15
-dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Genie + MAS + domains + benchmark + Job + App).")
+dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Lakebase + Genie + MAS + benchmark + App + Lakeflow Job + domains).")
