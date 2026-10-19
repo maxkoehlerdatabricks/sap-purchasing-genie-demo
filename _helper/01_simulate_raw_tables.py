@@ -581,4 +581,4 @@ print(f"  concentrated quota arrangements:{len(concentrated)}")
 
 # COMMAND ----------
 
-dbutils.notebook.exit("01_simulate_raw_tables: SUCCESS — 13 RAW_* tables written.")
+dbutils.notebook.exit("01_simulate_raw_tables: SUCCESS — 12 RAW_* tables + Ariba supplier-risk export written.")

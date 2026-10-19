@@ -245,14 +245,38 @@ def ensure_supplier_risk_pipeline():
     The pipeline source is ``02_build_gold/02d_supplier_risk_pipeline.sql`` in the demo
     folder. It publishes RAW_SUPPLIER_RISK (streaming table) and SUPPLIER_RISK
     (materialized view) into the demo schema. Plain Delta tables with these names from an
-    earlier, notebook-only version of the demo are dropped first, because a pipeline
-    cannot take over a table it did not create.
+    earlier, notebook-only version of the demo are dropped, because a pipeline cannot take
+    over a table it did not create. Uses the REST API (the serverless notebook SDK may
+    predate some pipeline settings such as the event log).
     """
     from databricks.sdk import WorkspaceClient
-    from databricks.sdk.service import pipelines as P
 
-    ws = WorkspaceClient()
+    api = WorkspaceClient().api_client
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {CFG.namespace}.{CFG.ariba_volume}")
+
+    spec = {
+        "name": CFG.ariba_pipeline_name,
+        "catalog": CFG.catalog,
+        "schema": CFG.schema,
+        "serverless": True,
+        "continuous": False,
+        "development": False,
+        "channel": "CURRENT",
+        "libraries": [{"file": {"path": f"{demo_root()}/02_build_gold/02d_supplier_risk_pipeline.sql"}}],
+        "configuration": {"ariba_landing_path": CFG.ariba_landing_path},
+        "event_log": {"catalog": CFG.catalog, "schema": CFG.schema, "name": CFG.ariba_event_log},
+        "tags": {"demo": "sap-purchasing-genie"},
+    }
+    found = api.do("GET", "/api/2.0/pipelines",
+                   query={"filter": f"name LIKE '{CFG.ariba_pipeline_name}'"}).get("statuses", [])
+    found = [p for p in found if p.get("name") == CFG.ariba_pipeline_name]
+    if found:
+        pid = found[0]["pipeline_id"]
+        api.do("PUT", f"/api/2.0/pipelines/{pid}", body={"id": pid, **spec})
+        print(f"✓ Updated pipeline '{CFG.ariba_pipeline_name}' ({pid})")
+    else:
+        pid = api.do("POST", "/api/2.0/pipelines", body=spec)["pipeline_id"]
+        print(f"✓ Created pipeline '{CFG.ariba_pipeline_name}' ({pid})")
 
     for t in PIPELINE_TABLES:
         rows = spark.sql(f"""SELECT table_type FROM {CFG.catalog}.information_schema.tables
@@ -260,30 +284,6 @@ def ensure_supplier_risk_pipeline():
         if rows and rows[0]["table_type"] in ("MANAGED", "EXTERNAL"):
             spark.sql(f"DROP TABLE {CFG.fq(t)}")
             print(f"  dropped legacy Delta table {t} (now owned by the pipeline)")
-
-    spec = dict(
-        name=CFG.ariba_pipeline_name,
-        catalog=CFG.catalog,
-        schema=CFG.schema,
-        serverless=True,
-        continuous=False,
-        development=False,
-        channel="CURRENT",
-        libraries=[P.PipelineLibrary(file=P.FileLibrary(
-            path=f"{demo_root()}/02_build_gold/02d_supplier_risk_pipeline.sql"))],
-        configuration={"ariba_landing_path": CFG.ariba_landing_path},
-        event_log=P.EventLogSpec(catalog=CFG.catalog, schema=CFG.schema, name=CFG.ariba_event_log),
-        tags={"demo": "sap-purchasing-genie"},
-    )
-    existing = [p for p in ws.pipelines.list_pipelines(filter=f"name LIKE '{CFG.ariba_pipeline_name}'")
-                if p.name == CFG.ariba_pipeline_name]
-    if existing:
-        pid = existing[0].pipeline_id
-        ws.pipelines.update(pipeline_id=pid, **spec)
-        print(f"✓ Updated pipeline '{CFG.ariba_pipeline_name}' ({pid})")
-    else:
-        pid = ws.pipelines.create(**spec).pipeline_id
-        print(f"✓ Created pipeline '{CFG.ariba_pipeline_name}' ({pid})")
     return pid
 
 
