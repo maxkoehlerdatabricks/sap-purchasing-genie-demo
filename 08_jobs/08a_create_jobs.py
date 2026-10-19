@@ -8,12 +8,17 @@
 # MAGIC ```
 # MAGIC simulate_raw_sap
 # MAGIC   ├─ gold_material ─┬─ gold_sourcing ─────────┐
-# MAGIC   └─ gold_supplier ─┼─ gold_supplier_risk ────┼─ constraints_comments ─ data_quality_gate ─ dq_passed?
+# MAGIC   └─ gold_supplier ─┼─ gold_supplier_risk* ───┼─ constraints_comments ─ data_quality_gate ─ dq_passed?
 # MAGIC                     └─ gold_purchase_order ───┘                                             │ true
 # MAGIC                     ┌──────────────────────────────┬────────────────────────────────────────┤
 # MAGIC              sql_functions                  metric_views                          value_dictionaries
 # MAGIC                     └──────────────────────────────┴──────── sync_lakebase_worklist ────────┘
 # MAGIC ```
+# MAGIC
+# MAGIC `*` = a **Lakeflow Declarative Pipeline** task: Auto Loader ingests the SAP Ariba
+# MAGIC Supplier Risk export files into `RAW_SUPPLIER_RISK` and builds the gold
+# MAGIC `SUPPLIER_RISK` materialized view (`02_build_gold/02d_supplier_risk_pipeline.sql`).
+# MAGIC Every other task is a serverless notebook.
 # MAGIC
 # MAGIC What it shows:
 # MAGIC * **Job parameters** (`catalog`, `schema`, `warehouse_id`) flow into every task.
@@ -44,6 +49,9 @@ RUN_NOW = True
 ROOT = demo_root()
 print(f"Demo folder: {ROOT}")
 
+# The Lakeflow Declarative Pipeline for the Ariba slice (created/updated, not run here).
+PIPELINE_ID = ensure_supplier_risk_pipeline()
+
 # COMMAND ----------
 
 # MAGIC %md
@@ -64,7 +72,10 @@ tasks = [
     nb("gold_material", "02_build_gold/02a_material", ["simulate_raw_sap"]),
     nb("gold_supplier", "02_build_gold/02b_supplier", ["simulate_raw_sap"]),
     nb("gold_sourcing", "02_build_gold/02c_sourcing", ["gold_material", "gold_supplier"]),
-    nb("gold_supplier_risk", "02_build_gold/02d_supplier_risk", ["gold_supplier"]),
+    # Workflow D runs as a pipeline task (Auto Loader → streaming table → materialized view).
+    jobs.Task(task_key="gold_supplier_risk", timeout_seconds=3600,
+              depends_on=[jobs.TaskDependency(task_key="gold_supplier")],
+              pipeline_task=jobs.PipelineTask(pipeline_id=PIPELINE_ID, full_refresh=False)),
     nb("gold_purchase_order", "02_build_gold/02e_purchase_order", ["gold_material", "gold_supplier"]),
     nb("constraints_comments", "02_build_gold/02f_constraints_comments",
        ["gold_sourcing", "gold_supplier_risk", "gold_purchase_order"]),
@@ -82,7 +93,8 @@ tasks = [
 
 settings = dict(
     name=CFG.job_name,
-    description=("SAP purchasing demo pipeline: simulate SAP extracts, build the governed gold layer, "
+    description=("SAP purchasing demo pipeline: simulate SAP extracts, ingest the Ariba supplier-risk "
+                 "files with a Lakeflow Declarative Pipeline, build the governed gold layer, "
                  "gate on data quality, refresh SQL functions + metric views, and sync the sourcing-risk "
                  "worklist into Lakebase for the App."),
     tasks=tasks,

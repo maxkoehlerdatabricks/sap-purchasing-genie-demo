@@ -16,8 +16,9 @@
 # MAGIC
 # MAGIC ## What it runs (in order)
 # MAGIC 0. `_helper/00_preflight_checks`        — validate catalog perms, warehouse, governed tags.
-# MAGIC 1. `_helper/01_simulate_raw_tables`   — generate the 13 RAW_* tables.
-# MAGIC 2. `02_build_gold/02a..02e`           — Workflows A–E → 5 gold tables.
+# MAGIC 1. `_helper/01_simulate_raw_tables`   — generate 12 RAW_* tables + the SAP Ariba supplier-risk export files.
+# MAGIC 2. `02_build_gold/02a..02e`           — Workflows A–E → 5 gold tables. Workflow D (`02d`) runs a
+# MAGIC    **Lakeflow Declarative Pipeline**: Auto Loader → `RAW_SUPPLIER_RISK` → gold `SUPPLIER_RISK`.
 # MAGIC 3. `02_build_gold/02f_constraints_comments` — PK/FK + column/table comments.
 # MAGIC 4. `03_semantics/03a..03c`            — SQL functions, metric views, value dicts.
 # MAGIC 5. `04_resources/04a_resources`       — ensure warehouse + grant UC permissions.
@@ -113,7 +114,7 @@ else:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1) Simulate the 13 raw tables
+# MAGIC ## 1) Simulate the raw SAP tables (12 Delta tables + Ariba export files in a volume)
 
 # COMMAND ----------
 
@@ -130,7 +131,7 @@ run_child("./_helper/01_simulate_raw_tables")
 run_child("./02_build_gold/02a_material")     # Workflow A → MATERIAL
 run_child("./02_build_gold/02b_supplier")     # Workflow B → SUPPLIER
 run_child("./02_build_gold/02c_sourcing")     # Workflow C → SOURCING
-run_child("./02_build_gold/02d_supplier_risk")# Workflow D → SUPPLIER_RISK
+run_child("./02_build_gold/02d_supplier_risk")# Workflow D → Lakeflow pipeline → SUPPLIER_RISK
 run_child("./02_build_gold/02e_purchase_order")# Workflow E → PURCHASE_ORDER
 
 # COMMAND ----------

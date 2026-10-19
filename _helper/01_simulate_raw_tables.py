@@ -4,7 +4,7 @@
 # environment_version = "6"
 # ///
 # MAGIC %md
-# MAGIC # _helper/01_simulate_raw_tables — Simulate all 13 RAW_* SAP tables
+# MAGIC # _helper/01_simulate_raw_tables — Simulate the RAW_* SAP tables + the Ariba export files
 # MAGIC
 # MAGIC Every raw table mirrors a standard SAP table and grain (spec §3) and is
 # MAGIC **simulated independently before any joining happens**. We use a deterministic
@@ -26,6 +26,10 @@
 # MAGIC
 # MAGIC The 13 raw tables (SAP origin / grain):
 # MAGIC MARA, MAKT, MARC, LFA1, LFB1, LFM1, EORD, EQUK, EQUP, SUPPLIER_RISK, EKKO, EKPO, EKBE.
+# MAGIC
+# MAGIC 12 are written directly as Delta tables. SUPPLIER_RISK comes from SAP Ariba, so it is
+# MAGIC written as **JSON export files** into a UC volume and ingested by a Lakeflow
+# MAGIC Declarative Pipeline (Auto Loader) — see `02_build_gold/02d_supplier_risk`.
 
 # COMMAND ----------
 
@@ -383,10 +387,18 @@ write_raw(equp_rows, equp_schema, "RAW_EQUP")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## RAW_SUPPLIER_RISK — Supplier risk classification (Ariba-styled), time-sliced
+# MAGIC ## SAP Ariba Supplier Risk export files (feed RAW_SUPPLIER_RISK), time-sliced
+# MAGIC This is the **one source simulated as files** instead of a table. SAP Ariba Supplier
+# MAGIC Risk exports are written as JSON lines (one full snapshot per export day) into the
+# MAGIC UC volume `ariba_landing`. The Lakeflow Declarative Pipeline
+# MAGIC (`02_build_gold/02d_supplier_risk_pipeline.sql`) then ingests them with Auto Loader
+# MAGIC into `RAW_SUPPLIER_RISK` and builds gold `SUPPLIER_RISK`.
+# MAGIC
 # MAGIC 1 row per LIFNR + VALID_FROM. Risky vendors get an active window covering AS_OF
-# MAGIC with `DELIVERY_RISK_FLAG='X'`. We also add historical (expired) windows so the
-# MAGIC time-slicing is real (drives Q8: risk active *at order date*).
+# MAGIC with a delivery-risk indicator. We also add historical (expired) windows so the
+# MAGIC time-slicing is real (drives Q8: risk active *at order date*). Two deliberately bad
+# MAGIC records (unknown vendor, invalid score) show the pipeline's referential-integrity
+# MAGIC join and expectations at work; they never reach gold.
 
 # COMMAND ----------
 
@@ -416,15 +428,40 @@ for v in LIFNRS:
             "VALID_FROM": AS_OF - dt.timedelta(days=random.randint(150, 350)),
             "VALID_TO": AS_OF + dt.timedelta(days=random.randint(90, 400)),
         })
-risk_schema = StructType([
-    StructField("LIFNR", StringType()),
-    StructField("RISK_CATEGORY", StringType()),
-    StructField("DELIVERY_RISK_FLAG", StringType()),
-    StructField("RISK_SCORE", IntegerType()),
-    StructField("VALID_FROM", DateType()),
-    StructField("VALID_TO", DateType()),
-])
-write_raw(risk_rows, risk_schema, "RAW_SUPPLIER_RISK")
+import json
+
+# Map to the Ariba export layout (field names as in an Ariba Supplier Risk export).
+ariba_records = [{
+    "exportDate": AS_OF.isoformat(),
+    "smVendorId": r["LIFNR"],
+    "supplierName": VENDOR_META[r["LIFNR"]]["NAME1"],
+    "riskDomain": r["RISK_CATEGORY"],
+    "deliveryRiskIndicator": r["DELIVERY_RISK_FLAG"] == "X",
+    "overallRiskScore": r["RISK_SCORE"],
+    "validity": {"validFrom": r["VALID_FROM"].isoformat(), "validTo": r["VALID_TO"].isoformat()},
+} for r in risk_rows]
+# Deliberately bad records: dropped by the pipeline (RI join / expectation), never in gold.
+ariba_records += [
+    {"exportDate": AS_OF.isoformat(), "smVendorId": "V999999", "supplierName": "Unknown vendor (not in SAP)",
+     "riskDomain": "DELIVERY", "deliveryRiskIndicator": True, "overallRiskScore": 90,
+     "validity": {"validFrom": (AS_OF - dt.timedelta(days=30)).isoformat(),
+                  "validTo": (AS_OF + dt.timedelta(days=60)).isoformat()}},
+    {"exportDate": AS_OF.isoformat(), "smVendorId": LIFNRS[0], "supplierName": VENDOR_META[LIFNRS[0]]["NAME1"],
+     "riskDomain": "QUALITY", "deliveryRiskIndicator": False, "overallRiskScore": 140,
+     "validity": {"validFrom": (AS_OF - dt.timedelta(days=900)).isoformat(),
+                  "validTo": (AS_OF - dt.timedelta(days=850)).isoformat()}},
+]
+
+spark.sql(f"CREATE VOLUME IF NOT EXISTS {CFG.namespace}.{CFG.ariba_volume}")
+dbutils.fs.mkdirs(CFG.ariba_landing_path)
+# One file per export day. Re-running on the same day rewrites the same file (Auto Loader
+# does not re-ingest it); a new day adds a new snapshot file.
+ariba_file = f"{CFG.ariba_landing_path}supplier_risk_export_{AS_OF:%Y%m%d}.json"
+with open(ariba_file, "w") as f:
+    f.write("\n".join(json.dumps(r) for r in ariba_records) + "\n")
+print(f"  ✓ Ariba export {ariba_file}: {len(ariba_records)} records "
+      f"({len(risk_rows)} valid + 2 deliberately bad)")
+print("  files in landing volume:", [x.name for x in dbutils.fs.ls(CFG.ariba_landing_path)])
 
 # COMMAND ----------
 
@@ -529,6 +566,9 @@ write_raw(ekbe_rows, ekbe_schema, "RAW_EKBE")
 # COMMAND ----------
 
 for t in RAW_TABLES:
+    if t in PIPELINE_TABLES:
+        print(f"{t:<20}  (Ariba export files → Lakeflow pipeline, see 02d)")
+        continue
     c = spark.table(CFG.fq(t)).count()
     print(f"{t:<20} {c:>7,} rows")
 

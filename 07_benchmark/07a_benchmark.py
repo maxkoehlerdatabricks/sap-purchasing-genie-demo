@@ -183,6 +183,7 @@ if RUN_MAS_EVAL and MAS_ENDPOINT:
             out = ask_mas(q["question"])
             mas_sig, _text = mas_result_signature(out, q["signature"])
             row["mas"] = mas_sig
+            row["answer"] = _text
             if q["signature"] == "rowcount" and isinstance(kg.get("value"), int) and isinstance(mas_sig, int):
                 # allow small tolerance (Genie sometimes returns a preview subset)
                 row["match"] = (mas_sig == kg["value"]) or (mas_sig > 0 and kg["value"] > 0)
@@ -209,6 +210,14 @@ if RUN_MAS_EVAL and MAS_ENDPOINT:
     passed = sum(1 for r in results if r["match"])
     accuracy = 100.0 * passed / len(results) if results else 0.0
     print(f"\n===== MAS ACCURACY: {passed}/{len(results)} = {accuracy:.1f}% =====")
+
+    # One full answer, exactly as the supervisor agent returned it (run evidence).
+    ex = next((r for r in results if r["id"] == "Q3" and r.get("answer")), None)
+    if ex:
+        print(f"\n===== Example answer from {MAS_ENDPOINT} =====")
+        print(f"Question: {ex['question']}")
+        print(f"Known-good rows: {ex['known_good']} | MAS rows: {ex['mas']} | match: {ex['match']}\n")
+        print(ex["answer"])
 else:
     print("MAS eval disabled or endpoint missing — Level 1 (known-good SQL) only.")
 

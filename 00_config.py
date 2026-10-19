@@ -100,6 +100,16 @@ class DemoConfig:
         # a synced table takes this UC schema name.
         self.sync_schema = f"{self.schema}_sync"
 
+        # ---- Lakeflow Declarative Pipeline for the Ariba slice (Workflow D) ----
+        # SAP Ariba Supplier Risk exports land as JSON files in this UC volume; the
+        # pipeline ingests them with Auto Loader into RAW_SUPPLIER_RISK and builds the
+        # gold SUPPLIER_RISK materialized view (PK, comments, expectations).
+        self.ariba_volume = "ariba_landing"
+        self.ariba_landing_path = (f"/Volumes/{self.catalog}/{self.schema}/"
+                                   f"{self.ariba_volume}/supplier_risk/")
+        self.ariba_pipeline_name = f"sap_purchasing_ariba_supplier_risk_{self.schema}"
+        self.ariba_event_log = "_ARIBA_PIPELINE_EVENT_LOG"
+
     # ---- Convenience helpers ----
     def fq(self, table: str) -> str:
         """Return the fully-qualified name ``catalog.schema.table``."""
@@ -146,11 +156,15 @@ RAW_TABLES = [
     "RAW_EORD",           # Source list
     "RAW_EQUK",           # Quota arrangement header
     "RAW_EQUP",           # Quota arrangement item
-    "RAW_SUPPLIER_RISK",  # Supplier risk classification (Ariba-styled)
+    "RAW_SUPPLIER_RISK",  # Supplier risk (SAP Ariba export files -> Lakeflow pipeline)
     "RAW_EKKO",           # PO header
     "RAW_EKPO",           # PO line item
     "RAW_EKBE",           # PO history (GR/invoice events)
 ]
+
+# Built by the Lakeflow Declarative Pipeline (Workflow D), not by the simulator /
+# gold notebooks. All other raw and gold tables are plain Delta tables.
+PIPELINE_TABLES = ["RAW_SUPPLIER_RISK", "SUPPLIER_RISK"]
 
 # 5 analysis-ready gold tables.
 GOLD_TABLES = [
@@ -213,6 +227,64 @@ def demo_root():
         except Exception:
             d = d.rsplit("/", 1)[0] if "/" in d else ""
     raise RuntimeError(f"Could not locate 00_config above {nb_path}")
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Lakeflow Declarative Pipeline for the Ariba slice (Workflow D)
+# MAGIC Used by `02d_supplier_risk` (create + run), `08a_create_jobs` (pipeline task) and
+# MAGIC `99_teardown`. Idempotent by name.
+
+# COMMAND ----------
+
+
+def ensure_supplier_risk_pipeline():
+    """Create or update the Ariba supplier-risk pipeline; return its pipeline_id.
+
+    The pipeline source is ``02_build_gold/02d_supplier_risk_pipeline.sql`` in the demo
+    folder. It publishes RAW_SUPPLIER_RISK (streaming table) and SUPPLIER_RISK
+    (materialized view) into the demo schema. Plain Delta tables with these names from an
+    earlier, notebook-only version of the demo are dropped first, because a pipeline
+    cannot take over a table it did not create.
+    """
+    from databricks.sdk import WorkspaceClient
+    from databricks.sdk.service import pipelines as P
+
+    ws = WorkspaceClient()
+    spark.sql(f"CREATE VOLUME IF NOT EXISTS {CFG.namespace}.{CFG.ariba_volume}")
+
+    for t in PIPELINE_TABLES:
+        rows = spark.sql(f"""SELECT table_type FROM {CFG.catalog}.information_schema.tables
+                             WHERE table_schema = '{CFG.schema}' AND lower(table_name) = lower('{t}')""").collect()
+        if rows and rows[0]["table_type"] in ("MANAGED", "EXTERNAL"):
+            spark.sql(f"DROP TABLE {CFG.fq(t)}")
+            print(f"  dropped legacy Delta table {t} (now owned by the pipeline)")
+
+    spec = dict(
+        name=CFG.ariba_pipeline_name,
+        catalog=CFG.catalog,
+        schema=CFG.schema,
+        serverless=True,
+        continuous=False,
+        development=False,
+        channel="CURRENT",
+        libraries=[P.PipelineLibrary(file=P.FileLibrary(
+            path=f"{demo_root()}/02_build_gold/02d_supplier_risk_pipeline.sql"))],
+        configuration={"ariba_landing_path": CFG.ariba_landing_path},
+        event_log=P.EventLogSpec(catalog=CFG.catalog, schema=CFG.schema, name=CFG.ariba_event_log),
+        tags={"demo": "sap-purchasing-genie"},
+    )
+    existing = [p for p in ws.pipelines.list_pipelines(filter=f"name LIKE '{CFG.ariba_pipeline_name}'")
+                if p.name == CFG.ariba_pipeline_name]
+    if existing:
+        pid = existing[0].pipeline_id
+        ws.pipelines.update(pipeline_id=pid, **spec)
+        print(f"✓ Updated pipeline '{CFG.ariba_pipeline_name}' ({pid})")
+    else:
+        pid = ws.pipelines.create(**spec).pipeline_id
+        print(f"✓ Created pipeline '{CFG.ariba_pipeline_name}' ({pid})")
+    return pid
 
 
 # COMMAND ----------

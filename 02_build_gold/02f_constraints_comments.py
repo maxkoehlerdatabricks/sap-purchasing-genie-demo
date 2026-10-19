@@ -15,6 +15,12 @@
 # MAGIC 1. `ALTER TABLE ... ALTER COLUMN ... SET NOT NULL` on every key column.
 # MAGIC 2. `ALTER TABLE ... ADD CONSTRAINT ... PRIMARY KEY (...)`.
 # MAGIC 3. Add FKs referencing the parent PKs.
+# MAGIC
+# MAGIC **SUPPLIER_RISK** is a materialized view owned by the Lakeflow pipeline (Workflow D,
+# MAGIC `02d_supplier_risk_pipeline.sql`). Its NOT NULL columns, primary key
+# MAGIC `pk_risk (LIFNR, VALID_FROM)` and table / column comments are declared in the
+# MAGIC pipeline definition, because a pipeline-owned table cannot be altered here. The
+# MAGIC verification cell at the end lists the constraints of all 5 gold tables.
 
 # COMMAND ----------
 
@@ -51,7 +57,6 @@ for t, cons in {
     "MATERIAL": ["pk_material"],
     "SUPPLIER": ["pk_supplier"],
     "SOURCING": ["pk_sourcing", "fk_sourcing_material", "fk_sourcing_supplier"],
-    "SUPPLIER_RISK": ["fk_risk_supplier"],
     "PURCHASE_ORDER": ["pk_po", "fk_po_supplier"],
 }.items():
     drop_constraints(t, cons)
@@ -67,7 +72,6 @@ for tbl, cols in {
     "MATERIAL": ["MATNR", "WERKS"],
     "SUPPLIER": ["LIFNR", "EKORG"],
     "SOURCING": ["MATNR", "WERKS", "LIFNR"],
-    "SUPPLIER_RISK": ["LIFNR", "VALID_FROM"],
     "PURCHASE_ORDER": ["EBELN", "EBELP"],
 }.items():
     for c in cols:
@@ -85,8 +89,7 @@ run(f"ALTER TABLE {NS}.SUPPLIER ADD CONSTRAINT pk_supplier PRIMARY KEY (LIFNR, E
 run(f"ALTER TABLE {NS}.SOURCING ADD CONSTRAINT pk_sourcing PRIMARY KEY (MATNR, WERKS, LIFNR)")
 # PURCHASE_ORDER PK on EBELN+EBELP.
 run(f"ALTER TABLE {NS}.PURCHASE_ORDER ADD CONSTRAINT pk_po PRIMARY KEY (EBELN, EBELP)")
-# SUPPLIER_RISK is time-sliced (multiple rows per LIFNR); PK includes VALID_FROM.
-run(f"ALTER TABLE {NS}.SUPPLIER_RISK ADD CONSTRAINT pk_risk PRIMARY KEY (LIFNR, VALID_FROM)")
+# SUPPLIER_RISK (time-sliced, PK LIFNR+VALID_FROM) gets its PK in the Lakeflow pipeline.
 
 # COMMAND ----------
 
@@ -135,11 +138,6 @@ TABLE_COMMENTS = {
         "(RAW_EQUK⨝RAW_EQUP). QUOTA may be NULL (source-listed but not quota-split — a "
         "meaningful gap). IS_VALID_SOURCE=true means a non-blocked source-list entry "
         "(NOTKZ<>'X'). Central table for multi-sourcing / single-sourcing analysis.",
-    "SUPPLIER_RISK":
-        "Gold: time-sliced supplier risk classification (Ariba-styled). One row per "
-        "vendor (LIFNR) and validity window (VALID_FROM..VALID_TO). "
-        "DELIVERY_RISK_FLAG='X' marks delivery risk. Join at query time; for 'active' "
-        "risk, filter VALID_FROM<=date<=VALID_TO.",
     "PURCHASE_ORDER":
         "Gold: purchase-order lines at grain PO number + item (EBELN+EBELP). Built by "
         "Workflow E from RAW_EKPO⨝RAW_EKKO with earliest goods-receipt date from "
@@ -184,14 +182,6 @@ COLUMN_COMMENTS = {
         "QUOTA": "Quota percentage allocated to this vendor (NULL if not quota-split).",
         "IS_VALID_SOURCE": "TRUE when NOTKZ<>'X' (a valid, non-blocked source).",
     },
-    "SUPPLIER_RISK": {
-        "LIFNR": "Vendor the risk assessment applies to (relates to SUPPLIER.LIFNR).",
-        "RISK_CATEGORY": "Risk category: FINANCIAL, DELIVERY, QUALITY, COMPLIANCE, GEOPOLITICAL.",
-        "DELIVERY_RISK_FLAG": "'X' = vendor flagged with delivery risk in this window.",
-        "RISK_SCORE": "Risk score 0-100 (higher = riskier).",
-        "VALID_FROM": "Start date of the risk assessment window.",
-        "VALID_TO": "End date of the risk assessment window.",
-    },
     "PURCHASE_ORDER": {
         "EBELN": "Purchase order number.",
         "EBELP": "Purchase order line item number.",
@@ -217,7 +207,21 @@ for t, cols in COLUMN_COMMENTS.items():
 
 # COMMAND ----------
 
-for t in ["MATERIAL", "SUPPLIER", "SOURCING", "SUPPLIER_RISK", "PURCHASE_ORDER"]:
+cons = spark.sql(f"""
+  SELECT tc.table_name, tc.constraint_name, tc.constraint_type,
+         concat_ws(', ', collect_list(kcu.column_name)) AS columns
+  FROM {CFG.catalog}.information_schema.table_constraints tc
+  JOIN {CFG.catalog}.information_schema.key_column_usage kcu
+    ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema
+  WHERE tc.table_schema = '{CFG.schema}'
+  GROUP BY ALL ORDER BY tc.table_name, tc.constraint_type DESC""")
+display(cons)
+pks = {r["table_name"].upper() for r in cons.collect() if r["constraint_type"] == "PRIMARY KEY"}
+missing = [t for t in GOLD_TABLES if t not in pks]
+print(f"Gold tables with a primary key: {sorted(pks)}")
+assert not missing, f"Missing primary key on: {missing}"
+
+for t in GOLD_TABLES:
     print(f"\n===== {t} =====")
     spark.sql(f"DESCRIBE TABLE EXTENDED {NS}.{t}").show(60, truncate=False)
 

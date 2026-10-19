@@ -14,7 +14,9 @@
 # MAGIC ## What it deletes
 # MAGIC 1. **Databricks App** — `sap-purchasing-app`.
 # MAGIC 2. **Lakeflow Job** — `sap_purchasing_lakeflow_pipeline` (and the earlier
-# MAGIC    single-task job `sap_purchasing_data_prep`, if still present).
+# MAGIC    single-task job `sap_purchasing_data_prep`, if still present), and the
+# MAGIC    **Lakeflow Declarative Pipeline** for the Ariba slice (deleting it also removes
+# MAGIC    `RAW_SUPPLIER_RISK` and `SUPPLIER_RISK`, which it owns).
 # MAGIC 3. **Multi-Agent Supervisor (MAS)** + its **serving endpoint** (looked up from
 # MAGIC    `_MAS_ENDPOINT`, falling back to the tiles API by name).
 # MAGIC 4. **Genie spaces** — both, looked up from `_GENIE_SPACES`, falling back to the
@@ -26,7 +28,7 @@
 # MAGIC    database, and the Lakebase project `sap-purchasing-ops` (purged, so the name can
 # MAGIC    be reused at once). This deletes all mitigation cases.
 # MAGIC 7. **The whole schema** `catalog.schema` (all gold + raw + metric views + SQL
-# MAGIC    functions + the `_*` metadata tables) and the sync schema `<schema>_sync`
+# MAGIC    functions + the `_*` metadata tables + the `ariba_landing` volume) and the sync schema `<schema>_sync`
 # MAGIC    via `DROP SCHEMA ... CASCADE`.
 # MAGIC
 # MAGIC ## What it does NOT delete (intentionally)
@@ -53,6 +55,7 @@ SCHEMA = "purchasing_demo"                       # Schema created by the demo (w
 MAS_NAME = "sap_purchasing_supervisor"
 APP_NAME = "sap-purchasing-app"
 JOB_NAMES = ["sap_purchasing_lakeflow_pipeline", "sap_purchasing_data_prep"]  # current + legacy
+ARIBA_PIPELINE_NAME = f"sap_purchasing_ariba_supplier_risk_{SCHEMA}"
 GENIE_SPACE_1_NAME = "SAP Purchasing — Sourcing & Supplier Risk"
 GENIE_SPACE_2_NAME = "SAP Purchasing — Purchase Order Analytics"
 
@@ -129,7 +132,7 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2) Delete the Lakeflow Job (and the legacy data-prep job)
+# MAGIC ## 2) Delete the Lakeflow Job (and the legacy data-prep job) + the Ariba pipeline
 
 # COMMAND ----------
 
@@ -144,6 +147,19 @@ for job_name in JOB_NAMES:
             print("  ✓ job deleted")
     except Exception as e:
         print(f"  (could not delete job '{job_name}': {e})")
+
+# The Ariba supplier-risk pipeline (after the job, which references it).
+try:
+    found = [p for p in w.pipelines.list_pipelines(filter=f"name LIKE '{ARIBA_PIPELINE_NAME}'")
+             if p.name == ARIBA_PIPELINE_NAME]
+    if not found:
+        print(f"  (pipeline '{ARIBA_PIPELINE_NAME}' not found)")
+    for p in found:
+        print(f"Deleting pipeline '{ARIBA_PIPELINE_NAME}' ({p.pipeline_id})…")
+        w.pipelines.delete(pipeline_id=p.pipeline_id)
+        print("  ✓ pipeline deleted (with RAW_SUPPLIER_RISK and SUPPLIER_RISK)")
+except Exception as e:
+    print(f"  (could not delete pipeline '{ARIBA_PIPELINE_NAME}': {e})")
 
 # COMMAND ----------
 
