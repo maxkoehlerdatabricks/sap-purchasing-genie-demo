@@ -53,11 +53,12 @@ def drop_constraints(table, names):
             print(f"  (skip drop {n}: {e})")
 
 
+# Child tables first: a PK cannot be dropped while a FK still references it.
 for t, cons in {
+    "SOURCING": ["fk_sourcing_material", "fk_sourcing_supplier", "pk_sourcing"],
+    "PURCHASE_ORDER": ["fk_po_supplier", "pk_po"],
     "MATERIAL": ["pk_material"],
     "SUPPLIER": ["pk_supplier"],
-    "SOURCING": ["pk_sourcing", "fk_sourcing_material", "fk_sourcing_supplier"],
-    "PURCHASE_ORDER": ["pk_po", "fk_po_supplier"],
 }.items():
     drop_constraints(t, cons)
 
