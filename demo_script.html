@@ -57,6 +57,7 @@
       <span class="pill">Databricks App</span>
       <span class="pill">Lakebase</span>
       <span class="pill">Lakeflow Jobs</span>
+      <span class="pill">Lakeflow Declarative Pipelines</span>
     </div>
   </div>
 </header>
@@ -65,11 +66,11 @@
 
   <p class="lead" style="margin-top:26px;">This script is a <strong>click-through of the Databricks
   UI</strong>. Each step says exactly where to click, what to say, and what to point out. Core run
-  time ~37 minutes (sections 1 to 10). Sections 11 (Lakebase) and 12 (Lakeflow Jobs) are optional
-  modules of about 7 and 5 minutes for audiences who care about operational apps and pipelines.
+  time ~37 minutes (sections 1 to 10). Sections 11 (Lakebase) and 12 (Lakeflow) are optional
+  modules of about 7 and 8 minutes for audiences who care about operational apps and pipelines.
   You can stop after any section.</p>
 
-  <h2 id="toc">Flow <span class="clock">~37 min core · ~49 min with modules</span></h2>
+  <h2 id="toc">Flow <span class="clock">~37 min core · ~52 min with modules</span></h2>
   <ol class="toc">
     <li><a href="#warmup">Pre-demo warm-up — seed Genie Ontology (day before)</a></li>
     <li><a href="#genie-one">Genie One — ask in plain English before anything else (6 min)</a></li>
@@ -83,7 +84,7 @@
     <li><a href="#dashboard">AI/BI Dashboard — a filter and two charts (3 min)</a></li>
     <li><a href="#app">The App — one screen for the business (4 min)</a></li>
     <li><a href="#lakebase">Optional module · From insight to action: mitigation cases on Lakebase (7 min)</a></li>
-    <li><a href="#lakeflow">Optional module · Lakeflow Jobs: one orchestrated pipeline keeps it all fresh (5 min)</a></li>
+    <li><a href="#lakeflow">Optional module · Lakeflow: Ariba files in with a Declarative Pipeline, one Job keeps it all fresh (8 min)</a></li>
   </ol>
 
   <!-- ============================================================ -->
@@ -298,7 +299,7 @@
         <tr><td><code class="inline">SOURCING</code></td><td>One approved material→vendor sourcing link at a plant (MATNR + WERKS + LIFNR)</td>
           <td>The source list + quota arrangement: which vendors may supply which material at which plant, the quota split (QUOTA), validity dates, and the derived IS_VALID_SOURCE flag.</td></tr>
         <tr><td><code class="inline">SUPPLIER_RISK</code></td><td>One risk assessment window for a supplier (LIFNR, time-sliced VALID_FROM..VALID_TO)</td>
-          <td>Ariba-styled risk classification: risk category, numeric risk score, and the delivery-risk flag (DELIVERY_RISK_FLAG) with the dates it was active.</td></tr>
+          <td>SAP Ariba Supplier Risk classification: risk category, numeric risk score, and the delivery-risk flag (DELIVERY_RISK_FLAG) with the dates it was active. A <strong>materialized view</strong> built by a Lakeflow Declarative Pipeline from Ariba export files (section 12).</td></tr>
         <tr><td><code class="inline">PURCHASE_ORDER</code></td><td>One purchase-order line item (EBELN + EBELP)</td>
           <td>PO header + line + history flattened from EKKO/EKPO/EKBE: material, supplier, order date, net price (NETPR), requested vs goods-receipt date, and the derived ON_TIME_FLAG.</td></tr>
         <tr><td><code class="inline">VALUE_DICTIONARY</code></td><td>One business-term → SAP-code mapping (DOMAIN + CODE)</td>
@@ -306,7 +307,11 @@
       </table>
       <div class="tip">The 13 <code class="inline">RAW_*</code> tables (MARA, MAKT, MARC, LFA1, LFB1, LFM1, EORD,
       EQUK, EQUP, SUPPLIER_RISK, EKKO, EKPO, EKBE) are the simulated SAP source; the gold tables above are what
-      the demo actually queries.</div>
+      the demo actually queries. Twelve are simulated directly as tables. <code class="inline">RAW_SUPPLIER_RISK</code>
+      is different: it comes from SAP Ariba, so it lands as JSON export files in the volume
+      <code class="inline">ariba_landing</code> and a Lakeflow Declarative Pipeline ingests it. That is why the
+      catalog shows it as a <strong>Streaming table</strong> and <code class="inline">SUPPLIER_RISK</code> as a
+      <strong>Materialized view</strong>.</div>
     </li>
     <li><span class="click-label">CLICK</span> the <strong>SOURCING</strong> table → <strong>Overview</strong> tab.
       <div class="show">The <strong>table description</strong> and the <strong>column comments</strong> — every
@@ -726,9 +731,10 @@
   the Lakeflow Job instead. Live reads go through the UC catalog.</div>
 
   <!-- ============================================================ -->
-  <h2 id="lakeflow">12 · Lakeflow Jobs: one orchestrated pipeline keeps it all fresh <span class="clock">5 min · optional</span></h2>
+  <h2 id="lakeflow">12 · Lakeflow: Ariba files in with a Declarative Pipeline, one Job keeps it all fresh <span class="clock">8 min · optional</span></h2>
   <div class="say">"Everything you've seen depends on data being fresh: the gold tables, the metric views,
-  the worklist in Lakebase. Who keeps that running every morning? One Lakeflow Job."</div>
+  the worklist in Lakebase. Who keeps that running every morning? One Lakeflow Job. And one part of it,
+  the Ariba feed, arrives as files, so it goes through a Lakeflow Declarative Pipeline."</div>
   <ol class="clicks">
     <li><span class="click-label">CLICK</span> left nav → <strong>Jobs &amp; Pipelines</strong> → open
       <strong>sap_purchasing_lakeflow_pipeline</strong> → tab <strong>Tasks</strong>.
@@ -739,6 +745,48 @@
       <div class="say">"This is the same pipeline you would otherwise run notebook by notebook. Here the
       dependencies are explicit. Independent steps run in parallel, on serverless, with no cluster to
       manage."</div>
+    </li>
+    <li><span class="click-label">POINT</span> at <code class="inline">gold_supplier_risk</code>. Its icon is
+      different: it is a <strong>pipeline task</strong>, not a notebook.
+      <div class="say">"Most of SAP reaches us as tables. Supplier risk does not. It comes from SAP Ariba as
+      daily export files. For that we use a Lakeflow Declarative Pipeline, and the job simply runs it as one
+      of its steps."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> Catalog → <code class="inline">purchasing_demo</code> →
+      <strong>Volumes</strong> → <code class="inline">ariba_landing</code> → <code class="inline">supplier_risk</code>.
+      <div class="show">One JSON file per export day, e.g. <code class="inline">supplier_risk_export_YYYYMMDD.json</code>.
+      Open it: Ariba field names such as <code class="inline">smVendorId</code>,
+      <code class="inline">deliveryRiskIndicator</code>, <code class="inline">overallRiskScore</code> and a nested
+      <code class="inline">validity</code> object. Not SAP column names.</div>
+      <div class="say">"This is what an Ariba export really looks like: files with their own vocabulary.
+      Somebody has to turn them into governed tables, every day, without loading anything twice."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> left nav → <strong>Jobs &amp; Pipelines</strong> → open the
+      pipeline <strong>sap_purchasing_ariba_supplier_risk_purchasing_demo</strong>.
+      <div class="show">The pipeline graph: <code class="inline">RAW_SUPPLIER_RISK</code> (streaming table) →
+      <code class="inline">SUPPLIER_RISK</code> (materialized view). Click <strong>Settings</strong> or the source
+      file to show it is about 40 lines of SQL (<code class="inline">02_build_gold/02d_supplier_risk_pipeline.sql</code>).</div>
+      <div class="say">"Two declarations, that's all. The first one is Auto Loader. It picks up only new files,
+      so tomorrow's export is added and today's is never read twice. The second one is the gold table. We
+      declare <em>what</em> it should contain. Lakeflow works out <em>how</em> and in which order."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> the <code class="inline">SUPPLIER_RISK</code> node → tab
+      <strong>Data quality</strong>.
+      <div class="show">The expectations <code class="inline">valid_score</code> and
+      <code class="inline">valid_window</code> with passed and failed records. One record failed
+      <code class="inline">valid_score</code> (a risk score of 140). A second bad record, vendor
+      <code class="inline">V999999</code> that does not exist in SAP, is removed by the join to SUPPLIER.
+      34 records came in, 32 reached gold.</div>
+      <div class="say">"Ariba sent us a score of 140 on a scale of 0 to 100, and a supplier SAP has never heard
+      of. Neither reaches the buyer. The pipeline drops them and records it, so we can go back to the source
+      and fix it."</div>
+    </li>
+    <li><span class="click-label">CLICK</span> Catalog → <code class="inline">SUPPLIER_RISK</code> → <strong>Overview</strong>.
+      <div class="show">Type <strong>Materialized view</strong>, the primary key <code class="inline">pk_risk
+      (LIFNR, VALID_FROM)</code> and the column comments. All declared in the pipeline, all governed in Unity
+      Catalog like every other gold table. Genie, the metric views and the App use it unchanged.</div>
+      <div class="tip">The lineage tab shows the full path: volume files → RAW_SUPPLIER_RISK → SUPPLIER_RISK →
+      metric view <code class="inline">mv_supplier_risk</code> and the SQL functions.</div>
     </li>
     <li><span class="click-label">POINT</span> at <code class="inline">data_quality_gate</code> and the
       condition task <code class="inline">dq_passed</code>.
