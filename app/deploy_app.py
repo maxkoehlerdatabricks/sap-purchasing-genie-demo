@@ -7,6 +7,10 @@
 # MAGIC the Genie spaces, and deploys the source from this demo folder. Runs inside
 # MAGIC `00_run_all` after `05a` (Genie), `06a` (MAS) and `10a`/`10b` (Lakebase).
 # MAGIC
+# MAGIC If `06a` recorded `mode = genie_router` (no Supervisor Agent possible in this
+# MAGIC workspace), the chat resource is the Foundation Model endpoint used for routing
+# MAGIC instead of the MAS endpoint, and the Genie space IDs are passed to the App.
+# MAGIC
 # MAGIC All runtime settings (catalog, schema, Lakebase coordinates) are passed as
 # MAGIC deployment environment variables from `00_config`, so `app.yaml` never needs edits.
 # MAGIC
@@ -54,8 +58,13 @@ APP_NAME = CFG.app_name
 APP_SOURCE = f"{demo_root()}/app"
 
 # Look up the MAS endpoint recorded by 06a and the Lakebase coordinates recorded by 10a.
-mas_row = spark.table(CFG.fq("_MAS_ENDPOINT")).first()
+mas_row = spark.table(CFG.fq("_MAS_ENDPOINT")).first().asDict()
+AGENT_MODE = mas_row.get("mode") or "mas"
 MAS_ENDPOINT = mas_row["endpoint_name"]
+SPACES = {r["space_key"]: r["space_id"] for r in spark.table(CFG.fq("_GENIE_SPACES")).collect()}
+# The serving endpoint behind the chat tab: the MAS endpoint, or the routing LLM.
+CHAT_ENDPOINT = MAS_ENDPOINT if AGENT_MODE == "mas" else CFG.model
+print(f"Agent mode: {AGENT_MODE} | chat endpoint resource: {CHAT_ENDPOINT}")
 LB = spark.table(CFG.fq("_LAKEBASE")).first().asDict()
 print(f"App: {APP_NAME}  | source: {APP_SOURCE}")
 print(f"warehouse: {CFG.warehouse_id}  | MAS endpoint: {MAS_ENDPOINT}  | Lakebase: {LB['database_resource']}")
@@ -76,9 +85,9 @@ resources = [
         ),
     ),
     AppResource(
-        name="mas-endpoint",
+        name="mas-endpoint" if AGENT_MODE == "mas" else "llm-endpoint",
         serving_endpoint=AppResourceServingEndpoint(
-            name=MAS_ENDPOINT,
+            name=CHAT_ENDPOINT,
             permission=AppResourceServingEndpointServingEndpointPermission.CAN_QUERY,
         ),
     ),
@@ -182,7 +191,11 @@ from databricks.sdk.service.apps import AppDeployment
 
 env = [
     EnvVar(name="DATABRICKS_WAREHOUSE_ID", value_from="sql-warehouse"),
-    EnvVar(name="MAS_ENDPOINT_NAME", value_from="mas-endpoint"),
+    EnvVar(name="AGENT_MODE", value=AGENT_MODE),
+    EnvVar(name="GENIE_SPACE_SOURCING", value=SPACES["sourcing_supplier_risk"]),
+    EnvVar(name="GENIE_SPACE_PO", value=SPACES["purchase_order_analytics"]),
+    (EnvVar(name="MAS_ENDPOINT_NAME", value_from="mas-endpoint") if AGENT_MODE == "mas"
+     else EnvVar(name="LLM_ENDPOINT_NAME", value_from="llm-endpoint")),
     EnvVar(name="DEMO_CATALOG", value=CFG.catalog),
     EnvVar(name="DEMO_SCHEMA", value=CFG.schema),
     EnvVar(name="LAKEBASE_HOST", value=LB["host"]),

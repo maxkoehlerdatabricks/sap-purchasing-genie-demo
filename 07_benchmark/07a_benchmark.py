@@ -104,11 +104,23 @@ print(f"\nKnown-good SQL: {sql_ok}/{len(QUESTIONS)} produced valid results.")
 # COMMAND ----------
 
 mas_row = spark.table(CFG.fq("_MAS_ENDPOINT")).first()
+MODE = (mas_row.asDict().get("mode") or "mas") if mas_row else "mas"
 MAS_ENDPOINT = mas_row["endpoint_name"] if mas_row else None
-print(f"MAS endpoint: {MAS_ENDPOINT}")
+if MODE == "genie_router":
+    # No Supervisor Agent in this workspace (see 06a): same questions through the Genie router.
+    import sys
+    sys.path.insert(0, f"{demo_root()}/app")
+    from backend.genie_router import ask as router_ask
+    SPACES = {r["space_key"]: r["space_id"] for r in spark.table(CFG.fq("_GENIE_SPACES")).collect()}
+    ROUTER_SPACES = {"Sourcing_Supplier_Risk": SPACES["sourcing_supplier_risk"],
+                     "Purchase_Order_Analytics": SPACES["purchase_order_analytics"]}
+    MAS_ENDPOINT = "genie-router"
+print(f"Supervisor mode: {MODE} | endpoint: {MAS_ENDPOINT}")
 
 
 def ask_mas(question, timeout=180):
+    if MODE == "genie_router":
+        return router_ask(w, CFG.model, ROUTER_SPACES, question)[0]
     headers = w.config.authenticate()
     url = f"{w.config.host}/serving-endpoints/{MAS_ENDPOINT}/invocations"
     r = requests.post(url, headers=headers, json={"input": [{"role": "user", "content": question}]}, timeout=timeout)

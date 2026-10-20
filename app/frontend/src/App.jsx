@@ -141,7 +141,7 @@ export default function App() {
         <h1>SAP Purchasing — Sourcing Risk & PO Analytics</h1>
         <nav>
           <button className={tab === "viz" ? "active" : ""} onClick={() => setTab("viz")}>Visualizations</button>
-          <button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat (MAS)</button>
+          <button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat (Agent)</button>
         </nav>
       </header>
       <main>{tab === "viz" ? <Visualizations /> : <Chat />}</main>

@@ -12,6 +12,14 @@
 # MAGIC
 # MAGIC Uses the `/api/2.0/multi-agent-supervisors` API directly (self-contained, no
 # MAGIC external package). Idempotent by name.
+# MAGIC
+# MAGIC **Fallback: Genie router.** Some workspaces cannot create Supervisor Agents (for
+# MAGIC example when serverless compute access control is enabled, the API answers "Supervisor
+# MAGIC Agent is not supported"). Then this notebook records `mode = genie_router`: the App
+# MAGIC chat and the benchmark use `app/backend/genie_router.py` instead, a small supervisor
+# MAGIC that routes with the same agent descriptions and instructions (Foundation Model API)
+# MAGIC and asks the Genie spaces through the Genie Conversation API. Everything downstream
+# MAGIC reads the mode from `_MAS_ENDPOINT`.
 
 # COMMAND ----------
 
@@ -107,8 +115,25 @@ def mas_find_by_name(name):
     return None
 
 
+MODE = "mas"
 existing = mas_find_by_name(CFG.mas_name)
-if existing:
+if not existing:
+    try:
+        res = _do("POST", "/api/2.0/multi-agent-supervisors",
+                  body={"name": CFG.mas_name, "agents": agents,
+                        "description": "Supervisor over the 2 SAP purchasing Genie spaces "
+                                       "(Sourcing & Supplier Risk; Purchase Order Analytics).",
+                        "instructions": INSTRUCTIONS})
+    except Exception as e:
+        if "not supported" not in str(e).lower():
+            raise
+        MODE = "genie_router"
+        print(f"⚠ Supervisor Agent cannot be created in this workspace: {e}")
+        print("→ Falling back to the Genie router (app/backend/genie_router.py).")
+
+if MODE == "genie_router":
+    tile_id, endpoint_name = None, None
+elif existing:
     print(f"Updating existing MAS '{CFG.mas_name}' ({existing})")
     res = _do("PATCH", f"/api/2.0/multi-agent-supervisors/{existing}",
               body={"tile_id": existing, "name": CFG.mas_name, "agents": agents,
@@ -118,18 +143,14 @@ if existing:
     tile = mas.get("tile", mas)
     tile_id = tile.get("tile_id", existing)
 else:
-    res = _do("POST", "/api/2.0/multi-agent-supervisors",
-              body={"name": CFG.mas_name, "agents": agents,
-                    "description": "Supervisor over the 2 SAP purchasing Genie spaces "
-                                   "(Sourcing & Supplier Risk; Purchase Order Analytics).",
-                    "instructions": INSTRUCTIONS})
     mas = res["multi_agent_supervisor"]
     tile = mas["tile"]
     tile_id = tile["tile_id"]
 
-endpoint_name = tile["serving_endpoint_name"]
-print(f"✓ MAS tile_id={tile_id}")
-print(f"✓ Serving endpoint: {endpoint_name}")
+if MODE == "mas":
+    endpoint_name = tile["serving_endpoint_name"]
+    print(f"✓ MAS tile_id={tile_id}")
+    print(f"✓ Serving endpoint: {endpoint_name}")
 
 # COMMAND ----------
 
@@ -150,8 +171,8 @@ def endpoint_ready():
         return False, f"(not yet created: {ex})"
 
 
-deadline = time.time() + 1800  # up to 30 min
-status = None
+deadline = time.time() + (1800 if MODE == "mas" else 0)  # up to 30 min
+status = "genie_router (no serving endpoint)" if MODE == "genie_router" else None
 while time.time() < deadline:
     ready, status = endpoint_ready()
     print(f"  endpoint state: {status}")
@@ -171,8 +192,8 @@ print(f"Final endpoint state: {status}")
 from pyspark.sql import Row
 
 spark.createDataFrame([Row(
-    mas_name=CFG.mas_name, tile_id=tile_id, endpoint_name=endpoint_name,
-)]).write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(CFG.fq("_MAS_ENDPOINT"))
+    mas_name=CFG.mas_name, tile_id=tile_id, endpoint_name=endpoint_name, mode=MODE,
+)], "mas_name STRING, tile_id STRING, endpoint_name STRING, mode STRING").write.format("delta").mode("overwrite").option("overwriteSchema", "true").saveAsTable(CFG.fq("_MAS_ENDPOINT"))
 
 print("Saved to _MAS_ENDPOINT:")
 display(spark.table(CFG.fq("_MAS_ENDPOINT")))
@@ -188,15 +209,21 @@ display(spark.table(CFG.fq("_MAS_ENDPOINT")))
 # messages, receive an `output` list of items (function_call + assistant messages).
 import requests
 
+SMOKE_Q = "Which materials have no multi-sourcing strategy?"
 try:
-    headers = w.config.authenticate()
-    url = f"{w.config.host}/serving-endpoints/{endpoint_name}/invocations"
-    r = requests.post(url, headers=headers,
-                      json={"input": [{"role": "user",
-                                       "content": "Which materials have no multi-sourcing strategy?"}]},
-                      timeout=160)
-    print("HTTP", r.status_code)
-    out = r.json().get("output", [])
+    if MODE == "mas":
+        headers = w.config.authenticate()
+        url = f"{w.config.host}/serving-endpoints/{endpoint_name}/invocations"
+        r = requests.post(url, headers=headers,
+                          json={"input": [{"role": "user", "content": SMOKE_Q}]}, timeout=160)
+        print("HTTP", r.status_code)
+        out = r.json().get("output", [])
+    else:
+        import sys
+        sys.path.insert(0, f"{demo_root()}/app")
+        from backend.genie_router import ask
+        out, _sql = ask(w, CFG.model, {"Sourcing_Supplier_Risk": S1, "Purchase_Order_Analytics": S2}, SMOKE_Q)
+        print("Genie router answered via:", [i["content"][0]["text"] for i in out if i["content"][0]["text"].startswith("<name>")])
     # The final assistant message holds the answer text.
     for item in out:
         if item.get("type") == "message":
@@ -208,4 +235,4 @@ except Exception as e:
 
 # COMMAND ----------
 
-dbutils.notebook.exit(f"06a_create_mas: SUCCESS — endpoint={endpoint_name}, status={status}")
+dbutils.notebook.exit(f"06a_create_mas: SUCCESS — mode={MODE}, endpoint={endpoint_name}, status={status}")

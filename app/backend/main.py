@@ -4,7 +4,8 @@ Three responsibilities:
   1) /api/charts/*  — run governed queries (metric views + trusted functions) against
      the SQL warehouse and return JSON for the Visualizations tab.
   2) /api/chat      — proxy a user message to the MAS serving endpoint (Responses API)
-     and return the assistant's answer for the Chat tab.
+     and return the assistant's answer for the Chat tab. Where the workspace cannot run a
+     Supervisor Agent, AGENT_MODE=genie_router sends it through backend/genie_router.py.
   3) /api/cases/*   — read the synced risk worklist and read/write mitigation cases in
      Lakebase (Postgres) for the Mitigation cases tab. See backend/cases.py.
 
@@ -32,6 +33,11 @@ SCHEMA = os.environ.get("DEMO_SCHEMA", "purchasing_demo")
 NS = f"{CATALOG}.{SCHEMA}"
 WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "")
 MAS_ENDPOINT = os.environ.get("MAS_ENDPOINT_NAME", "")
+# "mas" (Agent Bricks supervisor endpoint) or "genie_router" (see backend/genie_router.py).
+AGENT_MODE = os.environ.get("AGENT_MODE", "mas")
+LLM_ENDPOINT = os.environ.get("LLM_ENDPOINT_NAME", "databricks-claude-sonnet-4-5")
+ROUTER_SPACES = {"Sourcing_Supplier_Risk": os.environ.get("GENIE_SPACE_SOURCING", ""),
+                 "Purchase_Order_Analytics": os.environ.get("GENIE_SPACE_PO", "")}
 
 app = FastAPI(title="SAP Purchasing Demo")
 
@@ -106,7 +112,8 @@ def rows_to_records(cols, rows):
 @app.get("/api/health")
 def health():
     from backend.cases import LAKEBASE_INFO
-    return {"status": "ok", "namespace": NS, "mas_endpoint": MAS_ENDPOINT, "lakebase": LAKEBASE_INFO}
+    return {"status": "ok", "namespace": NS, "agent_mode": AGENT_MODE, "mas_endpoint": MAS_ENDPOINT,
+            "lakebase": LAKEBASE_INFO}
 
 
 @app.get("/api/charts/sourcing_coverage")
@@ -189,6 +196,16 @@ class ChatRequest(BaseModel):
 def chat(req: ChatRequest):
     """Send the user's message to the MAS endpoint and return the answer text + SQL."""
     w = _ws()
+    if AGENT_MODE == "genie_router":
+        from backend.genie_router import ask
+        try:
+            output, sql = ask(w, LLM_ENDPOINT, ROUTER_SPACES, req.message)
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Genie router failed: {e}")
+        texts = [i["content"][0]["text"] for i in output]
+        agents = [t[6:-7] for t in texts if t.startswith("<name>")]
+        answer = "\n\n".join(t for t in texts if not t.startswith("<name>"))
+        return {"answer": answer, "agent": " + ".join(agents), "sql": sql}
     try:
         headers = w.config.authenticate()
         url = f"{w.config.host}/serving-endpoints/{MAS_ENDPOINT}/invocations"

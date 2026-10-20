@@ -462,6 +462,12 @@
       Serving — it's deployed and queryable like any model endpoint.
     </li>
   </ol>
+  <div class="tip"><strong>If the workspace cannot create Supervisor Agents</strong> (06a prints
+  "Supervisor Agent cannot be created … Falling back to the Genie router"), there is no supervisor to open
+  here. Show the same routing in the App's <strong>Chat (Agent)</strong> tab instead: every answer is labelled
+  "routed to …" with the Genie space that answered. The router (<code class="inline">app/backend/genie_router.py</code>)
+  uses the same two agent descriptions and routing instructions, a Foundation Model for the routing decision
+  and the Genie Conversation API for the answer.</div>
   <!-- ============================================================ -->
   <h2 id="dataprep">8 · Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep <span class="clock">8 min</span></h2>
   <p>Everything so far ran on the governed <strong>gold tables</strong>. This section shows that the people who

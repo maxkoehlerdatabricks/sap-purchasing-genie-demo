@@ -16,6 +16,10 @@ It builds, end-to-end and on a blank workspace:
   + certified answers.
 - An **Agent Bricks Multi-Agent Supervisor (MAS)** over the two spaces, deployed as a
   serving endpoint.
+  Fallback for workspaces that block Supervisor Agents (e.g. serverless compute access
+  control): a **Genie router** (`app/backend/genie_router.py`) with the same agents and
+  routing instructions, on the Foundation Model API + Genie Conversation API. `06a`
+  detects this and records `mode` in `_MAS_ENDPOINT`; the App and the benchmark follow it.
 - **Governed tags**, **Discover domains/subdomains**, and **5 governed Pages** (business
   glossary) — the ontology layer that Genie One reads.
 - A **benchmark** of representative questions with known-good SQL and an **accuracy

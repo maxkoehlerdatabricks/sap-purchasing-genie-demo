@@ -4,8 +4,11 @@ FastAPI backend + a static frontend. Three tabs:
 
 1. **Visualizations** — KPI cards + charts sourced from the UC **metric views** and
    **trusted SQL functions** via the serverless SQL warehouse.
-2. **Chat (MAS)** — natural-language chat proxied to the **Agent Bricks Multi-Agent
+2. **Chat (Agent)** — natural-language chat proxied to the **Agent Bricks Multi-Agent
    Supervisor** serving endpoint (Responses API), which routes to the two Genie spaces.
+   Where the workspace cannot create a Supervisor Agent, `06a` records
+   `mode = genie_router` and the chat uses `backend/genie_router.py` instead: the routing
+   LLM picks the agent, the Genie Conversation API answers.
 3. **Mitigation cases (Lakebase)** — the risk worklist (synced from the Delta table
    `RISK_WORKLIST` into Lakebase) and the mitigation cases buyers open, update and close.
    Reads and writes go to Lakebase Postgres; every write is one transaction with its

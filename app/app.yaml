@@ -12,12 +12,10 @@ env:
   # below AND surfaced here as an env var the backend reads.
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
-  # The MAS serving endpoint powering the chat tab. Derived from the app resource
-  # named "mas-endpoint" (wired in deploy_app.py from the _MAS_ENDPOINT table), so it
-  # always matches the currently-deployed endpoint even after the MAS is recreated
-  # (the endpoint name changes on each recreation).
-  - name: MAS_ENDPOINT_NAME
-    valueFrom: mas-endpoint
+  # The chat tab: MAS_ENDPOINT_NAME (valueFrom the "mas-endpoint" resource) in MAS mode,
+  # or AGENT_MODE=genie_router + LLM_ENDPOINT_NAME + GENIE_SPACE_* where the workspace
+  # cannot run a Supervisor Agent. app/deploy_app sets these per mode as deployment
+  # env_vars, so they are not hardcoded here.
   # Fully-qualified schema the charts read from, and the Lakebase coordinates for the
   # Mitigation cases tab. NOTE: app/deploy_app passes ALL of these as deployment
   # env_vars from 00_config (overriding this file), so the values below are only
