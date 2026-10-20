@@ -7,7 +7,9 @@ purchasing landscape so a purchasing business analyst can answer **sourcing-risk
 It builds, end-to-end and on a blank workspace:
 
 - **13 simulated raw SAP tables** → **5 governed gold tables** (with PK/FK constraints,
-  table & column comments).
+  table & column comments). 12 are simulated as Delta tables. The SAP Ariba supplier-risk
+  feed is simulated as **JSON export files** and ingested by a **Lakeflow Declarative
+  Pipeline** (Auto Loader → streaming table → gold materialized view).
 - A **semantic layer**: parameterized **SQL functions** (trusted assets), **UC metric
   views**, and a **value dictionary**.
 - **2 Genie spaces** (domain-split) with **all instruction types** (ontology snippets)
@@ -62,7 +64,7 @@ With the Lakebase module, one more question closes the loop between insight and 
 MARA, MAKT, MARC        ─ Workflow A ─▶  MATERIAL (MATNR+WERKS)    ┐
 LFA1, LFB1, LFM1        ─ Workflow B ─▶  SUPPLIER (LIFNR+EKORG)    │   SQL functions (trusted)
 EORD, EQUK, EQUP        ─ Workflow C ─▶  SOURCING (MATNR+WERKS+LIFNR)│  UC metric views
-SUPPLIER_RISK           ─ Workflow D ─▶  SUPPLIER_RISK (LIFNR, time)│   Value dictionary
+Ariba JSON files ─ Workflow D* ─▶  SUPPLIER_RISK (LIFNR, time)│   Value dictionary
 EKKO, EKPO, EKBE        ─ Workflow E ─▶  PURCHASE_ORDER (EBELN+EBELP)┘
                                               │
                           ┌───────────────────┴────────────────────┐
@@ -74,6 +76,39 @@ EKKO, EKPO, EKBE        ─ Workflow E ─▶  PURCHASE_ORDER (EBELN+EBELP)┘
                                        Databricks App
                          (Visualizations + Chat + Mitigation cases)
 ```
+
+`*` Workflow D is a **Lakeflow Declarative Pipeline** (see below). Workflows A, B, C and E
+are notebooks.
+
+### Lakeflow Declarative Pipeline: the SAP Ariba slice (Workflow D)
+
+```
+_helper/01_simulate_raw_tables
+  writes SAP Ariba Supplier Risk exports (JSON lines, one full snapshot per export day)
+        │
+        ▼
+/Volumes/<catalog>/<schema>/ariba_landing/supplier_risk/supplier_risk_export_YYYYMMDD.json
+        │  Auto Loader: STREAM read_files(...), only new files
+        ▼
+RAW_SUPPLIER_RISK   streaming table · Ariba fields → SAP-style columns · _SOURCE_FILE, _INGESTED_AT
+        │  expectation has_vendor_id
+        ▼
+SUPPLIER_RISK       materialized view (gold) · latest snapshot · RI join to SUPPLIER
+                    expectations valid_score, valid_window · PRIMARY KEY pk_risk (LIFNR, VALID_FROM)
+                    table + column comments
+```
+
+* Source: `02_build_gold/02d_supplier_risk_pipeline.sql`. Pipeline name
+  `sap_purchasing_ariba_supplier_risk_<schema>`, serverless, triggered, event log
+  `_ARIBA_PIPELINE_EVENT_LOG` in the demo schema.
+* `02_build_gold/02d_supplier_risk` creates or updates the pipeline, runs one update and
+  prints the evidence: files, row counts, expectation results and the primary key. In the
+  Lakeflow Job the pipeline runs as the `gold_supplier_risk` **pipeline task**.
+* The export contains two deliberately bad records: an unknown vendor, dropped by the RI
+  join, and a score of 140, dropped by `valid_score`. Gold stays clean, and the event log
+  shows the drop.
+* The table names stay the same, so the SQL functions, metric views, Genie spaces, MAS
+  and App are unchanged.
 
 ### Lakebase loop: from insight to action
 
@@ -101,12 +136,14 @@ EKKO, EKPO, EKBE        ─ Workflow E ─▶  PURCHASE_ORDER (EBELN+EBELP)┘
 
 ```
 simulate_raw_sap ─┬─ gold_material ─┬─ gold_sourcing ───────┐
-                  └─ gold_supplier ─┼─ gold_supplier_risk ──┼─ constraints_comments ─ data_quality_gate ─ dq_passed? ─(true)─┐
+                  └─ gold_supplier ─┼─ gold_supplier_risk* ─┼─ constraints_comments ─ data_quality_gate ─ dq_passed? ─(true)─┐
                                     └─ gold_purchase_order ─┘                                                                │
             ┌───────────────────────────────┬────────────────────────────────────────────────────────────────────────────────┤
      sql_functions                    metric_views                                                                   value_dictionaries
             └───────────────────────────────┴────────────────── sync_lakebase_worklist ───────────────────────────────────────┘
 ```
+
+`*` = pipeline task (the Lakeflow Declarative Pipeline above). All other tasks are notebooks.
 
 Serverless, parameterized (`catalog`, `schema`, `warehouse_id`), with a data-quality gate
 (`08b`, results in `_DQ_RESULTS`) and a condition task that skips the refresh when a check
@@ -118,10 +155,11 @@ fails. A daily 06:00 schedule is created **paused**.
 | `MATERIAL` | MATNR + WERKS | Workflow A (MARC ⨝ MARA ⨝ MAKT[EN]) |
 | `SUPPLIER` | LIFNR + EKORG | Workflow B (LFM1 ⨝ LFA1; LFB1 dropped) |
 | `SOURCING` | MATNR + WERKS + LIFNR | Workflow C (EORD ⨝ flattened EQUK/EQUP) |
-| `SUPPLIER_RISK` | LIFNR, time-sliced | Workflow D (RAW_SUPPLIER_RISK, RI-validated) |
+| `SUPPLIER_RISK` | LIFNR, time-sliced | Workflow D, Lakeflow pipeline (RAW_SUPPLIER_RISK ← Ariba JSON via Auto Loader, RI-validated) |
 | `PURCHASE_ORDER` | EBELN + EBELP | Workflow E (EKPO ⨝ EKKO ⨝ earliest GR from EKBE) |
 
-Constraints: PK on each gold table; FK `SOURCING → MATERIAL`. Every table & column has a
+Constraints: PK on each gold table; FK `SOURCING → MATERIAL`. `02f` sets them on the four
+notebook-built tables. `SUPPLIER_RISK` declares its PK `pk_risk` in the pipeline definition. Every table & column has a
 `COMMENT`.
 
 ---
@@ -133,9 +171,11 @@ sap-purchasing-genie-demo/
   00_config.py                      # single source of truth (catalog/schema/warehouse/model/names)
   00_run_all.py                     # TOP-LEVEL orchestrator — parameterize ONCE here
   _helper/
-    01_simulate_raw_tables.py       # generate all 13 RAW_* tables (deterministic seed)
+    01_simulate_raw_tables.py       # 12 RAW_* Delta tables + Ariba export JSON files (deterministic seed)
+    export_run_evidence.py          # LOCAL script: export executed runs to evidence/notebooks/*.ipynb
   02_build_gold/
-    02a_material.py … 02e_purchase_order.py   # Workflows A–E
+    02a_material.py … 02e_purchase_order.py   # Workflows A–E (02d drives the pipeline)
+    02d_supplier_risk_pipeline.sql  # Lakeflow Declarative Pipeline: Auto Loader → RAW_SUPPLIER_RISK → SUPPLIER_RISK
     02f_constraints_comments.py     # PK/FK + column/table comments
   03_semantics/
     03a_sql_functions.py            # parameterized trusted SQL functions
@@ -166,6 +206,7 @@ sap-purchasing-genie-demo/
   app/                              # Databricks App (FastAPI + static frontend; backend/cases.py = Lakebase)
   99_teardown.py                    # DELETE every asset (app, jobs, MAS, Genie, Lakebase, domains, tags, schemas)
   demo_script.html                  # comprehensive demo walkthrough
+  evidence/                         # committed run outputs (see "Run evidence")
 ```
 
 ---
@@ -197,7 +238,8 @@ mitigation cases to the 3 seed cases (10 risks without a case).
 
 ### Teardown
 Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates:
-the App, the Lakeflow Job (and the legacy data-prep job), the MAS + serving endpoint, both
+the App, the Lakeflow Job (and the legacy data-prep job), the Ariba Lakeflow Declarative
+Pipeline (with the tables it owns), the MAS + serving endpoint, both
 Genie spaces, the Lakebase synced table, the UC catalog over Lakebase and the Lakebase
 project (purged), and the schemas `<schema>` and `<schema>_sync` (`DROP SCHEMA … CASCADE`,
 which removes all gold/raw tables, metric views, SQL functions and the `_*` metadata tables). Set `DELETE_DISCOVER = True` (the default) to also
@@ -229,6 +271,8 @@ the **schema is created**.
 | UC catalog over Lakebase | `sap_purchasing_ops` |
 | Sync schema (Delta → Lakebase) | `purchasing_demo_sync` |
 | Lakeflow Job | `sap_purchasing_lakeflow_pipeline` |
+| Lakeflow Declarative Pipeline | `sap_purchasing_ariba_supplier_risk_purchasing_demo` |
+| Ariba landing volume | `ariba_landing` (path `/Volumes/<catalog>/<schema>/ariba_landing/supplier_risk/`) |
 
 ---
 
@@ -242,4 +286,20 @@ the **schema is created**.
 - The App loads: charts render; chat returns MAS answers.
 - The **Mitigation cases** tab lists the 13-row worklist; creating a case drops "risks without
   an active case" from 10 to 9, and Genie space 1 answers the closed-loop question with 9 rows.
-- The Lakeflow Job run is green, including `data_quality_gate` and `sync_lakebase_worklist`.
+- The Lakeflow Job run is green, including the `gold_supplier_risk` pipeline task,
+  `data_quality_gate` and `sync_lakebase_worklist`.
+- The Ariba pipeline update is COMPLETED: `RAW_SUPPLIER_RISK` holds the 2 bad records,
+  `SUPPLIER_RISK` does not, and `pk_risk` is listed in `information_schema.table_constraints`.
+
+---
+
+## Run evidence
+
+The source notebooks are plain `.py` files so they stay easy to diff and run. Proof that
+they ran is committed separately in [`evidence/`](evidence/):
+
+* [`evidence/RUN_EVIDENCE.md`](evidence/RUN_EVIDENCE.md) summarizes the latest end-to-end run:
+  row counts, the Lakeflow pipeline result, the Genie space IDs, the MAS endpoint state,
+  the benchmark score and one full agent answer.
+* `evidence/notebooks/*.ipynb` are the **executed notebooks with their outputs**, one per
+  step, exported from the Databricks job runs with `_helper/export_run_evidence.py`.
