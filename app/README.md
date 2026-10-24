@@ -4,8 +4,10 @@ FastAPI backend + a static frontend. Three tabs:
 
 1. **Visualizations** — KPI cards + charts sourced from the UC **metric views** and
    **trusted SQL functions** via the serverless SQL warehouse.
-2. **Chat (MAS)** — natural-language chat proxied to the **Agent Bricks Multi-Agent
-   Supervisor** serving endpoint (Responses API), which routes to the two Genie spaces.
+2. **Chat (Supervisor)** — natural-language chat sent to the **supervisor agent**
+   (`agent-bricks-sap-supervisor`, built with the Agent Bricks CLI, see
+   `06_agent/supervisor`), which routes to the two Genie Agents. The answer shows the
+   Genie Agent(s) used and the SQL Genie ran.
 3. **Mitigation cases (Lakebase)** — the risk worklist (synced from the Delta table
    `RISK_WORKLIST` into Lakebase) and the mitigation cases buyers open, update and close.
    Reads and writes go to Lakebase Postgres; every write is one transaction with its
@@ -30,19 +32,20 @@ app/
 ## Deploy (recommended: the notebook)
 `00_run_all` runs `app/deploy_app`, which:
 1. creates the app (or recreates it if its service principal was deleted),
-2. wires the resources: `sql-warehouse` (CAN_USE), `mas-endpoint` (CAN_QUERY) and
-   `lakebase` (Postgres database, CAN_CONNECT_AND_CREATE),
+2. wires the resources: `sql-warehouse` (CAN_USE) and `lakebase` (Postgres database,
+   CAN_CONNECT_AND_CREATE),
 3. grants the app SP read/write on `ops.*` and read on the synced worklist in Postgres,
-   UC `SELECT` on the Lakebase catalog and `CAN_RUN` on both Genie spaces,
 4. deploys from this folder with **env vars from `00_config`** (catalog, schema, Lakebase
-   host/endpoint/database/schemas). They override the defaults in `app.yaml`.
+   host/endpoint/database/schemas, `SUPERVISOR_URL`). They override the defaults in `app.yaml`,
+5. grants the app SP `CAN_USE` on the supervisor app. The chat calls it with the SP's
+   OAuth token (Databricks Apps reject PATs).
 
 ## Local devloop
 ```bash
 cd app
 DATABRICKS_CONFIG_PROFILE=<profile> \
   DATABRICKS_WAREHOUSE_ID=<warehouse id> DEMO_CATALOG=<catalog> DEMO_SCHEMA=purchasing_demo \
-  MAS_ENDPOINT_NAME=<mas endpoint> \
+  SUPERVISOR_URL=<url of agent-bricks-sap-supervisor> \
   LAKEBASE_HOST=<endpoint host> \
   LAKEBASE_ENDPOINT=projects/sap-purchasing-ops/branches/production/endpoints/primary \
   uvicorn backend.main:app --reload --port 8000     # http://localhost:8000

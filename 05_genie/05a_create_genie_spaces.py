@@ -281,7 +281,7 @@ print(f"✓ Space 2 fully configured: {s2}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Persist the space IDs for downstream notebooks (MAS, App, benchmark)
+# MAGIC ## Persist the space IDs for downstream notebooks (supervisor, App, benchmark)
 # MAGIC We write them to a tiny Delta table so 06_agent / 07_benchmark / the App can look
 # MAGIC them up without hard-coding.
 

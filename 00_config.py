@@ -3,8 +3,8 @@
 # MAGIC # 00_config — Single Source of Truth
 # MAGIC
 # MAGIC This notebook defines **every** configuration value used across the whole demo:
-# MAGIC catalog, schema, warehouse, the LLM model, and the names of the Genie spaces,
-# MAGIC the Multi-Agent Supervisor (MAS) endpoint and the Databricks App.
+# MAGIC catalog, schema, warehouse, the LLM model, and the names of the Genie Agents,
+# MAGIC the Agent Bricks supervisor agent and the Databricks App.
 # MAGIC
 # MAGIC ## How parameterization works (read this!)
 # MAGIC * The demo is designed to be **parameterized in exactly one place**: the top-level
@@ -70,17 +70,22 @@ class DemoConfig:
         # ---- Derived, fully-qualified namespace ----
         self.namespace = f"{self.catalog}.{self.schema}"
 
-        # ---- The LLM used by the MAS orchestrator and the App chat ----
-        self.model = "databricks-claude-sonnet-4-5"
+        # ---- The LLM used by the supervisor agent (a system.ai AI Gateway model service;
+        # list them with `agentbricks experimental models list`) ----
+        self.model = "system.ai.claude-sonnet-4-5"
 
-        # ---- Asset names (Genie spaces, MAS endpoint, App) ----
+        # ---- Asset names (Genie Agents, supervisor agent, App) ----
         # Genie space 1: Sourcing & Supplier Risk domain
         self.genie_space_1_name = "SAP Purchasing — Sourcing & Supplier Risk"
         # Genie space 2: Purchase Order Analytics domain
         self.genie_space_2_name = "SAP Purchasing — Purchase Order Analytics"
-        # Agent Bricks Multi-Agent Supervisor
-        self.mas_name = "sap_purchasing_supervisor"
-        self.mas_endpoint_name = "sap-purchasing-mas"
+        # Supervisor agent built with the Agent Bricks CLI (06_agent/supervisor). It runs
+        # on Agent Runtime as the Databricks App `agent-bricks-<supervisor_name>`.
+        self.supervisor_name = "sap-supervisor"
+        self.supervisor_app_name = f"agent-bricks-{self.supervisor_name}"
+        self.supervisor_experiment = "/Shared/agentbricks_traces/sap-purchasing-supervisor"
+        # Legacy Supervisor Agent (MAS) name, only used by teardown to remove old deployments.
+        self.legacy_mas_name = "sap_purchasing_supervisor"
         # Databricks App
         self.app_name = "sap-purchasing-app"
         # Lakeflow Job: the multi-task pipeline raw -> gold -> semantics -> Lakebase.
@@ -115,7 +120,7 @@ class DemoConfig:
             f"  model         = {self.model!r}\n"
             f"  genie_space_1 = {self.genie_space_1_name!r}\n"
             f"  genie_space_2 = {self.genie_space_2_name!r}\n"
-            f"  mas_endpoint  = {self.mas_endpoint_name!r}\n"
+            f"  supervisor    = {self.supervisor_app_name!r}\n"
             f"  app_name      = {self.app_name!r}\n"
             f"  job_name      = {self.job_name!r}\n"
             f"  lakebase      = {self.lakebase_project!r}/{self.lakebase_database!r}"

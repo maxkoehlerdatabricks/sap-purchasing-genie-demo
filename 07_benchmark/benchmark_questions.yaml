@@ -2,13 +2,13 @@
 # Benchmark question set for the SAP Purchasing demo.
 # Each item has:
 #   id            - short identifier
-#   question      - natural-language question (asked to Genie / MAS in the demo)
+#   question      - natural-language question (asked to the supervisor agent in the demo)
 #   known_good_sql- the trusted, reviewed SQL that defines the correct answer
 #   signature     - how to compare: "rowcount" (compare number of rows) or
 #                   "scalar" (compare the single scalar value in row 0 col 0)
 #   space         - which Genie space this belongs to (for reference)
 # The runner executes known_good_sql on the gold layer and (optionally) asks the
-# MAS the NL question, then compares result signatures to compute an accuracy score.
+# supervisor agent the NL question, then compares result signatures to compute an accuracy score.
 # The 11 spec questions are Q1..Q11; QX_* are additional representative questions.
 # ============================================================================
 

@@ -2,10 +2,10 @@
 # MAGIC %md
 # MAGIC # app/deploy_app — Create & deploy the Databricks App (Python SDK)
 # MAGIC
-# MAGIC Creates the App (if missing), wires its resources (SQL warehouse, MAS serving
-# MAGIC endpoint, Lakebase database), grants its service principal access to Lakebase and
-# MAGIC the Genie spaces, and deploys the source from this demo folder. Runs inside
-# MAGIC `00_run_all` after `05a` (Genie), `06a` (MAS) and `10a`/`10b` (Lakebase).
+# MAGIC Creates the App (if missing), wires its resources (SQL warehouse, Lakebase
+# MAGIC database), grants its service principal access to Lakebase and CAN_USE on the
+# MAGIC supervisor agent app, and deploys the source from this demo folder. Runs inside
+# MAGIC `00_run_all` after `05a` (Genie), `06a` (supervisor) and `10a`/`10b` (Lakebase).
 # MAGIC
 # MAGIC All runtime settings (catalog, schema, Lakebase coordinates) are passed as
 # MAGIC deployment environment variables from `00_config`, so `app.yaml` never needs edits.
@@ -44,8 +44,7 @@ import time
 import psycopg
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.apps import App, AppResource, AppResourceSqlWarehouse, \
-    AppResourceServingEndpoint, AppResourceSqlWarehouseSqlWarehousePermission, \
-    AppResourceServingEndpointServingEndpointPermission, AppResourcePostgres, \
+    AppResourceSqlWarehouseSqlWarehousePermission, AppResourcePostgres, \
     AppResourcePostgresPostgresPermission, EnvVar
 
 w = WorkspaceClient()
@@ -53,12 +52,11 @@ w = WorkspaceClient()
 APP_NAME = CFG.app_name
 APP_SOURCE = f"{demo_root()}/app"
 
-# Look up the MAS endpoint recorded by 06a and the Lakebase coordinates recorded by 10a.
-mas_row = spark.table(CFG.fq("_MAS_ENDPOINT")).first()
-MAS_ENDPOINT = mas_row["endpoint_name"]
+# Look up the supervisor app recorded by 06a and the Lakebase coordinates recorded by 10a.
+SUPERVISOR = spark.table(CFG.fq("_SUPERVISOR")).first().asDict()
 LB = spark.table(CFG.fq("_LAKEBASE")).first().asDict()
 print(f"App: {APP_NAME}  | source: {APP_SOURCE}")
-print(f"warehouse: {CFG.warehouse_id}  | MAS endpoint: {MAS_ENDPOINT}  | Lakebase: {LB['database_resource']}")
+print(f"warehouse: {CFG.warehouse_id}  | supervisor: {SUPERVISOR['url']}  | Lakebase: {LB['database_resource']}")
 
 # COMMAND ----------
 
@@ -73,13 +71,6 @@ resources = [
         sql_warehouse=AppResourceSqlWarehouse(
             id=CFG.warehouse_id,
             permission=AppResourceSqlWarehouseSqlWarehousePermission.CAN_USE,
-        ),
-    ),
-    AppResource(
-        name="mas-endpoint",
-        serving_endpoint=AppResourceServingEndpoint(
-            name=MAS_ENDPOINT,
-            permission=AppResourceServingEndpointServingEndpointPermission.CAN_QUERY,
         ),
     ),
     # Lakebase database for the mitigation cases (creates the SP's Postgres role).
@@ -133,8 +124,8 @@ else:
 # MAGIC ## Grant the App's service principal access to the Lakebase data
 # MAGIC The `postgres` resource lets the SP connect. Table privileges are granted here by
 # MAGIC the schema owner: read/write on the case tables, read on the synced worklist.
-# MAGIC The SP also gets UC `SELECT` on the Lakebase catalog, because the chat tab runs
-# MAGIC Genie as the SP and the case functions read that catalog.
+# MAGIC The chat tab does not need UC grants here: the supervisor agent asks the Genie
+# MAGIC Agents as its own service principal, which 06a grants the Lakebase catalog.
 
 # COMMAND ----------
 
@@ -165,12 +156,6 @@ with psycopg.connect(host=LB["host"], dbname=LB["database"], user=ME, password=t
         c.execute(g)
         print("  ✓", g)
 
-for g in [f"GRANT USE CATALOG ON CATALOG {CFG.lakebase_catalog} TO `{SP}`",
-          f"GRANT USE SCHEMA ON CATALOG {CFG.lakebase_catalog} TO `{SP}`",
-          f"GRANT SELECT ON CATALOG {CFG.lakebase_catalog} TO `{SP}`"]:
-    spark.sql(g)
-    print("  ✓", g)
-
 # COMMAND ----------
 
 # MAGIC %md
@@ -182,7 +167,7 @@ from databricks.sdk.service.apps import AppDeployment
 
 env = [
     EnvVar(name="DATABRICKS_WAREHOUSE_ID", value_from="sql-warehouse"),
-    EnvVar(name="MAS_ENDPOINT_NAME", value_from="mas-endpoint"),
+    EnvVar(name="SUPERVISOR_URL", value=SUPERVISOR["url"]),
     EnvVar(name="DEMO_CATALOG", value=CFG.catalog),
     EnvVar(name="DEMO_SCHEMA", value=CFG.schema),
     EnvVar(name="LAKEBASE_HOST", value=LB["host"]),
@@ -201,29 +186,16 @@ print(f"App URL: {app.url}")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Grant the App's service principal CAN_RUN on the Genie spaces
-# MAGIC The MAS/Genie spaces run as `VIEWER`, so the **caller's** identity is used for the
-# MAGIC query. When the chat tab runs, the caller is the App's service principal — it must
-# MAGIC have at least CAN_RUN on each Genie space, otherwise the chat returns a permission
-# MAGIC error. (Schema SELECT/EXECUTE are already granted in 04a via `account users`.)
+# MAGIC ## Let the App's service principal call the supervisor agent
+# MAGIC The chat tab calls `agent-bricks-sap-supervisor` with the App SP's OAuth token, so
+# MAGIC the SP needs CAN_USE on that app.
 
 # COMMAND ----------
 
-sp_client_id = SP
-
-space_ids = [r["space_id"] for r in spark.table(CFG.fq("_GENIE_SPACES")).collect()]
-for sid in space_ids:
-    try:
-        # Resolve the numeric permissions object id, then grant CAN_RUN to the App SP.
-        g = w.api_client.do("GET", f"/api/2.0/permissions/genie/{sid}")
-        numeric = g["object_id"].split("/")[-1]
-        w.api_client.do("PATCH", f"/api/2.0/permissions/genie/{numeric}",
-                        body={"access_control_list": [
-                            {"service_principal_name": sp_client_id, "permission_level": "CAN_RUN"}]})
-        print(f"  ✓ granted CAN_RUN on Genie space {sid}")
-    except Exception as e:
-        print(f"  ⚠ could not grant on {sid}: {e}")
+w.api_client.do("PATCH", f"/api/2.0/permissions/apps/{SUPERVISOR['app_name']}",
+                body={"access_control_list": [{"service_principal_name": SP, "permission_level": "CAN_USE"}]})
+print(f"  ✓ CAN_USE on {SUPERVISOR['app_name']} for {SP}")
 
 # COMMAND ----------
 
-dbutils.notebook.exit(f"deploy_app: SUCCESS — {APP_NAME} deployed ({app.url}), Lakebase + Genie access granted.")
+dbutils.notebook.exit(f"deploy_app: SUCCESS — {APP_NAME} deployed ({app.url}), Lakebase + supervisor access granted.")

@@ -8,7 +8,7 @@
 # MAGIC 1. Ensure a **serverless** SQL warehouse exists and is usable (reuse the given one,
 # MAGIC    or create a small serverless warehouse if it is missing).
 # MAGIC 2. Grant the required Unity Catalog privileges on the demo schema so Genie, the
-# MAGIC    MAS endpoint, and the App can read the gold tables, functions and metric views.
+# MAGIC    supervisor agent, and the App can read the gold tables, functions and metric views.
 # MAGIC
 # MAGIC It is safe to re-run (idempotent).
 
@@ -58,7 +58,7 @@ if wh is None:
 
 # MAGIC %md
 # MAGIC ## 2) Grant Unity Catalog privileges on the demo schema
-# MAGIC We grant USE + SELECT + EXECUTE so consumers (Genie/MAS/App and analysts) can read
+# MAGIC We grant USE + SELECT + EXECUTE so consumers (Genie/supervisor/App and analysts) can read
 # MAGIC tables, run the trusted SQL functions and query metric views. Adjust the principal
 # MAGIC to your workspace group as needed. By default we grant to `account users` (broad,
 # MAGIC good for a demo). For a locked-down demo, replace with a specific group.

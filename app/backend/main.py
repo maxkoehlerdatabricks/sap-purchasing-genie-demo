@@ -3,8 +3,9 @@
 Three responsibilities:
   1) /api/charts/*  — run governed queries (metric views + trusted functions) against
      the SQL warehouse and return JSON for the Visualizations tab.
-  2) /api/chat      — proxy a user message to the MAS serving endpoint (Responses API)
-     and return the assistant's answer for the Chat tab.
+  2) /api/chat      — send a user message to the supervisor agent (Agent Bricks CLI,
+     running on Agent Runtime as its own Databricks App) and return its answer, the
+     Genie Agent(s) it routed to and the SQL Genie ran, for the Chat tab.
   3) /api/cases/*   — read the synced risk worklist and read/write mitigation cases in
      Lakebase (Postgres) for the Mitigation cases tab. See backend/cases.py.
 
@@ -14,7 +15,9 @@ Locally, we fall back to the configured CLI profile.
 """
 
 import os
+import json
 import logging
+import uuid
 from functools import lru_cache
 
 import requests
@@ -31,7 +34,9 @@ CATALOG = os.environ.get("DEMO_CATALOG", "max_kohler_demo_catalog")
 SCHEMA = os.environ.get("DEMO_SCHEMA", "purchasing_demo")
 NS = f"{CATALOG}.{SCHEMA}"
 WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID", "")
-MAS_ENDPOINT = os.environ.get("MAS_ENDPOINT_NAME", "")
+# URL of the supervisor agent app (agent-bricks-sap-supervisor), set by app/deploy_app.
+SUPERVISOR_URL = os.environ.get("SUPERVISOR_URL", "").rstrip("/")
+GENIE_TOOLS = ("sourcing_supplier_risk", "purchase_order_analytics")
 
 app = FastAPI(title="SAP Purchasing Demo")
 
@@ -106,7 +111,7 @@ def rows_to_records(cols, rows):
 @app.get("/api/health")
 def health():
     from backend.cases import LAKEBASE_INFO
-    return {"status": "ok", "namespace": NS, "mas_endpoint": MAS_ENDPOINT, "lakebase": LAKEBASE_INFO}
+    return {"status": "ok", "namespace": NS, "supervisor_url": SUPERVISOR_URL, "lakebase": LAKEBASE_INFO}
 
 
 @app.get("/api/charts/sourcing_coverage")
@@ -179,45 +184,61 @@ def kpis():
 
 
 # ---------------------------------------------------------------------------
-# Chat endpoint — proxy to the MAS serving endpoint (Responses API)
+# Chat endpoint — call the supervisor agent (DurableAgentServer /api/invocations)
 # ---------------------------------------------------------------------------
 class ChatRequest(BaseModel):
     message: str
 
 
+def _parse_turn(output):
+    """Return (Genie Agents asked, last Genie SQL, final answer) from the turn's messages."""
+    agents, sql, answer = [], "", ""
+    for m in output:
+        if m.get("type") == "ai":
+            for tc in m.get("tool_calls") or []:
+                agent = next((g for g in GENIE_TOOLS if tc.get("name", "").startswith(g)), None)
+                if agent and agent not in agents:
+                    agents.append(agent)
+            content = m.get("content")
+            if isinstance(content, list):
+                content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
+            if content and not m.get("tool_calls"):
+                answer = content
+        elif m.get("type") == "tool":
+            try:
+                result = json.loads(m.get("content") or "{}")
+            except Exception:
+                continue
+            for att in result.get("attachments") or []:
+                sql = (att.get("query") or {}).get("query") or sql
+    return agents, sql, answer
+
+
 @app.post("/api/chat")
 def chat(req: ChatRequest):
-    """Send the user's message to the MAS endpoint and return the answer text + SQL."""
+    """Send the user's message to the supervisor and return answer, routed agent(s) + SQL.
+
+    The App's service principal calls the supervisor app with its own OAuth token
+    (it has CAN_USE on that app). The supervisor then asks the Genie Agents as its own
+    service principal.
+    """
+    if not SUPERVISOR_URL:
+        raise HTTPException(status_code=503, detail="SUPERVISOR_URL is not configured.")
     w = _ws()
     try:
-        headers = w.config.authenticate()
-        url = f"{w.config.host}/serving-endpoints/{MAS_ENDPOINT}/invocations"
-        r = requests.post(url, headers=headers,
-                          json={"input": [{"role": "user", "content": req.message}]},
-                          timeout=180)
+        r = requests.post(f"{SUPERVISOR_URL}/api/invocations", headers=w.config.authenticate(),
+                          json={"id": str(uuid.uuid4()), "session_id": str(uuid.uuid4()),
+                                "input": {"messages": [{"role": "user", "content": req.message}]}},
+                          timeout=300)
         r.raise_for_status()
-        output = r.json().get("output", [])
+        body = r.json()
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"MAS query failed: {e}")
-
-    # Extract the routed agent name, any SQL, and the final answer text.
-    # The MAS emits a function_call whose `name` is the sub-agent it routed to
-    # (e.g. "Sourcing_Supplier_Risk"); prefer that over the supervisor's own name.
-    answer, sql, agent = "", "", ""
-    for item in output:
-        if item.get("type") == "function_call":
-            nm = item.get("name", "")
-            if nm and nm != MAS_ENDPOINT:
-                agent = nm
-        if item.get("type") == "message":
-            for c in item.get("content", []):
-                if c.get("type") == "output_text":
-                    txt = c["text"]
-                    if txt.startswith("<name>"):
-                        agent = txt.replace("<name>", "").replace("</name>", "").strip()
-                    else:
-                        answer = txt  # keep the last non-routing message as the answer
-    return {"answer": answer, "agent": agent, "sql": sql}
+        raise HTTPException(status_code=502, detail=f"Supervisor query failed: {e}")
+    if body.get("status") not in (None, "completed"):
+        raise HTTPException(status_code=502, detail=f"Supervisor run {body.get('status')}: {body.get('error')}")
+    out = body.get("output")
+    agents, sql, answer = _parse_turn(out.get("output", []) if isinstance(out, dict) else out or [])
+    return {"answer": answer, "agent": ", ".join(agents), "sql": sql}
 
 
 # ---------------------------------------------------------------------------

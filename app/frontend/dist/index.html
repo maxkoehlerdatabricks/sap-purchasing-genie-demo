@@ -69,7 +69,7 @@
       <h1>SAP Purchasing — Sourcing Risk &amp; PO Analytics</h1>
       <nav>
         <button id="tab-viz" class="active" onclick="showTab('viz')">Visualizations</button>
-        <button id="tab-chat" onclick="showTab('chat')">Chat (MAS)</button>
+        <button id="tab-chat" onclick="showTab('chat')">Chat (Supervisor)</button>
         <button id="tab-cases" onclick="showTab('cases')">Mitigation cases (Lakebase)</button>
       </nav>
     </header>
@@ -116,7 +116,7 @@
       </section>
     </main>
     <div class="toast" id="toast"></div>
-    <footer>Powered by Databricks Genie · Agent Bricks Multi-Agent Supervisor · Unity Catalog metric views · Lakebase</footer>
+    <footer>Powered by Databricks Genie Agents · Agent Bricks supervisor agent · Unity Catalog metric views · Lakebase</footer>
   </div>
 
 <script>
@@ -177,7 +177,7 @@ async function send(text){
   const inp=document.getElementById('input');
   const q=(text||inp.value).trim(); if(!q||busy) return;
   renderMsg('user', q); inp.value=''; busy=true;
-  renderMsg('assistant', 'Thinking… (routing via the Multi-Agent Supervisor)');
+  renderMsg('assistant', 'Thinking… (the supervisor is asking the Genie Agents)');
   try{
     const res=await j('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:q})});
     document.getElementById('messages').lastChild.remove();

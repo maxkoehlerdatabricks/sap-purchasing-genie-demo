@@ -79,7 +79,7 @@ function Visualizations() {
 }
 
 // ---------------------------------------------------------------------------
-// Chat tab — talks to the MAS endpoint via /api/chat
+// Chat tab — talks to the supervisor agent via /api/chat
 // ---------------------------------------------------------------------------
 const SAMPLES = [
   "Which materials have no multi-sourcing strategy?",
@@ -122,7 +122,7 @@ function Chat() {
             <pre>{m.text}</pre>
           </div>
         ))}
-        {busy && <div className="msg assistant"><pre>Thinking… (routing via the Multi-Agent Supervisor)</pre></div>}
+        {busy && <div className="msg assistant"><pre>Thinking… (the supervisor is asking the Genie Agents)</pre></div>}
       </div>
       <div className="composer">
         <input value={input} onChange={(e) => setInput(e.target.value)}
@@ -141,11 +141,11 @@ export default function App() {
         <h1>SAP Purchasing — Sourcing Risk & PO Analytics</h1>
         <nav>
           <button className={tab === "viz" ? "active" : ""} onClick={() => setTab("viz")}>Visualizations</button>
-          <button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat (MAS)</button>
+          <button className={tab === "chat" ? "active" : ""} onClick={() => setTab("chat")}>Chat (Supervisor)</button>
         </nav>
       </header>
       <main>{tab === "viz" ? <Visualizations /> : <Chat />}</main>
-      <footer>Powered by Databricks Genie · Agent Bricks Multi-Agent Supervisor · Unity Catalog metric views</footer>
+      <footer>Powered by Databricks Genie Agents · Agent Bricks supervisor agent · Unity Catalog metric views</footer>
     </div>
   );
 }

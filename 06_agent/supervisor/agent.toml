@@ -1,0 +1,18 @@
+schema_version = 1
+
+# Agent Bricks project for the SAP purchasing supervisor.
+#
+# The two Genie Agent tools are NOT listed here: their space IDs change every time
+# 05a recreates the Genie Agents. 06a_deploy_supervisor copies this project to a
+# temp dir and adds them with
+#   agentbricks tools add genie-agent <space_id> --name sourcing_supplier_risk --auth app
+#   agentbricks tools add genie-agent <space_id> --name purchase_order_analytics --auth app
+# before running `agentbricks deploy`. No memory or session store is declared: each
+# chat turn is answered on its own, so only the Runtime Store is provisioned.
+
+[agent]
+framework = "langgraph"
+server = "agentbricks"
+
+[tracing]
+experiment_name = "/Shared/agentbricks_traces/sap-purchasing-supervisor"

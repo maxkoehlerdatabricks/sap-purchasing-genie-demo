@@ -293,7 +293,7 @@ print(f"  ✓ {n} seed cases written")
 
 # MAGIC %md
 # MAGIC ## 6) Register the Lakebase database as a Unity Catalog catalog
-# MAGIC This is what closes the loop: the warehouse (and therefore Genie and the MAS) can
+# MAGIC This is what closes the loop: the warehouse (and therefore Genie and the supervisor agent) can
 # MAGIC query `sap_purchasing_ops.ops.mitigation_case` **live**, governed by UC.
 
 # COMMAND ----------

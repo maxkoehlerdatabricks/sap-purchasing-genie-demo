@@ -15,8 +15,9 @@
 # MAGIC 1. **Databricks App** — `sap-purchasing-app`.
 # MAGIC 2. **Lakeflow Job** — `sap_purchasing_lakeflow_pipeline` (and the earlier
 # MAGIC    single-task job `sap_purchasing_data_prep`, if still present).
-# MAGIC 3. **Multi-Agent Supervisor (MAS)** + its **serving endpoint** (looked up from
-# MAGIC    `_MAS_ENDPOINT`, falling back to the tiles API by name).
+# MAGIC 3. **Supervisor agent** `agent-bricks-sap-supervisor` + its **Runtime Store**
+# MAGIC    (via `agentbricks deployments delete`) and its MLflow tracing experiment. Also
+# MAGIC    removes a legacy Supervisor Agent (MAS) tile + endpoint left by older versions.
 # MAGIC 4. **Genie spaces** — both, looked up from `_GENIE_SPACES`, falling back to the
 # MAGIC    data-rooms API by display name.
 # MAGIC 5. **Discover pages, domains & governed tags** *(optional, controlled by
@@ -50,7 +51,9 @@ CATALOG = "max_kohler_demo_catalog"              # Unity Catalog (existing, take
 SCHEMA = "purchasing_demo"                       # Schema created by the demo (will be DROPPED)
 
 # Asset names (must match 00_config.py).
-MAS_NAME = "sap_purchasing_supervisor"
+SUPERVISOR_APP_NAME = "agent-bricks-sap-supervisor"
+SUPERVISOR_EXPERIMENT = "/Shared/agentbricks_traces/sap-purchasing-supervisor"
+LEGACY_MAS_NAME = "sap_purchasing_supervisor"   # legacy Supervisor Agent tile, if still present
 APP_NAME = "sap-purchasing-app"
 JOB_NAMES = ["sap_purchasing_lakeflow_pipeline", "sap_purchasing_data_prep"]  # current + legacy
 GENIE_SPACE_1_NAME = "SAP Purchasing — Sourcing & Supplier Risk"
@@ -148,67 +151,55 @@ for job_name in JOB_NAMES:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3) Delete the MAS + its serving endpoint
-# MAGIC Prefer the endpoint name recorded in `_MAS_ENDPOINT`; also delete the MAS tile so
-# MAGIC no orphaned supervisor remains.
+# MAGIC ## 3) Delete the supervisor agent (Agent Bricks CLI) + its Runtime Store
+# MAGIC `agentbricks deployments delete` drops the Runtime Store first (it needs the app's
+# MAGIC service principal), then the app. The tracing experiment is deleted separately.
+# MAGIC A legacy Supervisor Agent (MAS) tile is removed too; deleting the tile also removes
+# MAGIC its serving endpoint.
 
 # COMMAND ----------
 
-# 3a) Read the recorded endpoint name (used only as a fallback below).
-endpoint_name = None
-if _table_exists(f"{NS}._MAS_ENDPOINT"):
+# MAGIC %run ./06_agent/_agentbricks_helpers
+
+# COMMAND ----------
+
+# 3a) Supervisor agent app + Runtime Store, then the source folder `agentbricks deploy` synced.
+try:
+    source_path = w.api_client.do("GET", f"/api/2.0/apps/{SUPERVISOR_APP_NAME}").get("default_source_code_path")
+    print(f"Deleting supervisor '{SUPERVISOR_APP_NAME}' and its Runtime Store…")
+    agentbricks("deployments", "delete", SUPERVISOR_APP_NAME, "--yes")
+    print("  ✓ supervisor deleted")
+    if source_path:
+        w.workspace.delete(source_path, recursive=True)
+        print(f"  ✓ deleted deployment source {source_path}")
+except Exception as e:
+    if "does not exist" in str(e).lower() or "not found" in str(e).lower():
+        print(f"  (supervisor '{SUPERVISOR_APP_NAME}' not found)")
+    else:
+        print(f"  ⚠ could not delete supervisor '{SUPERVISOR_APP_NAME}': {e}")
+
+# 3b) MLflow tracing experiment.
+try:
+    exp = w.experiments.get_by_name(SUPERVISOR_EXPERIMENT)
+    w.experiments.delete_experiment(exp.experiment.experiment_id)
+    print(f"  ✓ deleted experiment {SUPERVISOR_EXPERIMENT}")
+except Exception as e:
+    print(f"  (experiment {SUPERVISOR_EXPERIMENT} not found: {str(e)[:80]})")
+
+# 3c) Legacy Supervisor Agent (MAS) tile, found by name via the tiles API.
+try:
+    resp = _do("GET", "/api/2.0/tiles", params={"filter": f"name_contains={LEGACY_MAS_NAME}&&tile_type=MAS"})
+    tiles = [t["tile_id"] for t in (resp.get("tiles") or []) if t.get("name") == LEGACY_MAS_NAME]
+except Exception:
+    tiles = []
+for tile_id in tiles:
     try:
-        row = spark.table(f"{NS}._MAS_ENDPOINT").first()
-        if row:
-            endpoint_name = row["endpoint_name"]
-    except Exception as e:
-        print(f"  (could not read _MAS_ENDPOINT: {e})")
-
-
-# 3b) MAS tile — find by name via the tiles API.
-def mas_find_by_name(name):
-    page_token = None
-    try:
-        while True:
-            params = {"filter": f"name_contains={name}&&tile_type=MAS"}
-            if page_token:
-                params["page_token"] = page_token
-            resp = _do("GET", "/api/2.0/tiles", params=params)
-            for t in (resp.get("tiles") or []):
-                if t.get("name") == name:
-                    return t.get("tile_id")
-            page_token = resp.get("next_page_token")
-            if not page_token:
-                break
-    except Exception:
-        return None
-    return None
-
-
-# 3c) Delete the MAS tile — this is the correct API and it CASCADES to (removes) the
-# associated serving endpoint. The endpoint cannot be deleted on its own
-# ("Please delete the tile to delete all associated endpoints").
-tile_id = mas_find_by_name(MAS_NAME)
-if tile_id:
-    try:
-        print(f"Deleting MAS '{MAS_NAME}' (tile_id={tile_id}) — this also removes its endpoint…")
         _do("DELETE", f"/api/2.0/tiles/{tile_id}")
-        print("  ✓ MAS tile + endpoint deleted")
+        print(f"  ✓ deleted legacy MAS tile {tile_id} (and its serving endpoint)")
     except Exception as e:
-        print(f"  (could not delete MAS tile {tile_id}: {e})")
-else:
-    print(f"  (MAS '{MAS_NAME}' not found)")
-
-# 3d) Fallback: if the tile was already gone but an orphaned endpoint remains, try to
-# delete it directly (best-effort; normally the tile delete above handles it).
-if endpoint_name:
-    try:
-        w.serving_endpoints.get(name=endpoint_name)
-        print(f"Endpoint '{endpoint_name}' still present — deleting directly…")
-        w.serving_endpoints.delete(name=endpoint_name)
-        print("  ✓ serving endpoint deleted")
-    except Exception:
-        print(f"  (serving endpoint '{endpoint_name}' already removed)")
+        print(f"  (could not delete legacy MAS tile {tile_id}: {e})")
+if not tiles:
+    print(f"  (no legacy MAS '{LEGACY_MAS_NAME}' found)")
 
 # COMMAND ----------
 
@@ -415,7 +406,7 @@ except Exception as e:
 # MAGIC ## 7) Drop the whole schema (tables, views, functions, metadata)
 # MAGIC `DROP SCHEMA ... CASCADE` removes all 5 gold tables, the 13 raw tables, the 4
 # MAGIC metric views, all SQL functions, `VALUE_DICTIONARY`, and the `_GENIE_SPACES` /
-# MAGIC `_MAS_ENDPOINT` / `_BENCHMARK_RESULTS` metadata tables in one shot.
+# MAGIC `_SUPERVISOR` / `_BENCHMARK_RESULTS` metadata tables in one shot.
 
 # COMMAND ----------
 

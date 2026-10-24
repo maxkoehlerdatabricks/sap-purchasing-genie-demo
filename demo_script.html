@@ -53,7 +53,7 @@
       <span class="pill">SQL AI assistant</span>
       <span class="pill">Visual Data Prep</span>
       <span class="pill">Metric Views</span>
-      <span class="pill">Agent Bricks (MAS)</span>
+      <span class="pill">Agent Bricks CLI (supervisor)</span>
       <span class="pill">Databricks App</span>
       <span class="pill">Lakebase</span>
       <span class="pill">Lakeflow Jobs</span>
@@ -78,7 +78,7 @@
     <li><a href="#catalog">Catalog Explorer — the governed data model (4 min)</a></li>
     <li><a href="#genie1">Genie: Sourcing &amp; Supplier Risk (5 min)</a></li>
     <li><a href="#genie2">Genie: Purchase Order Analytics (3 min)</a></li>
-    <li><a href="#mas">Agent Bricks — the Multi-Agent Supervisor (3 min)</a></li>
+    <li><a href="#mas">Agent Bricks — the supervisor agent (3 min)</a></li>
     <li><a href="#dataprep">Authoring with AI — Notebook + Genie, SQL from a prompt, Visual Data Prep (8 min)</a></li>
     <li><a href="#dashboard">AI/BI Dashboard — a filter and two charts (3 min)</a></li>
     <li><a href="#app">The App — one screen for the business (4 min)</a></li>
@@ -96,7 +96,7 @@
 
   <ol class="clicks">
     <li><span class="click-label">RUN</span> the full setup: execute <code class="inline">00_run_all</code>
-      to create all tables, functions, metric views, Genie Agents, and the MAS.
+      to create all tables, functions, metric views, Genie Agents, and the supervisor agent.
       <div class="tip">Skip if you've already run setup and the schema is populated.</div>
     </li>
     <li><span class="click-label">INTERACT</span> with <strong>Genie Agent 1</strong> — "Sourcing &amp; Supplier Risk."
@@ -156,7 +156,7 @@
     <li><span class="click-label">SHOW</span> the unified <strong>Genie</strong> landing page.
       <div class="show">There's <strong>one Genie</strong> — the audience doesn't have to know which space or table
       to pick. Point out that Genie can be pointed at the whole <code class="inline">purchasing_demo</code> schema,
-      and that later in the demo we'll show two <em>curated</em> spaces plus a supervisor that route automatically.</div>
+      and that later in the demo we'll show two <em>curated</em> Genie Agents plus a supervisor that routes automatically.</div>
       <div class="say">"Think of this as the front door. One box. Everything else we build today — the governed
       tables, the certified functions, the metric views, the supervisor — exists so that the answers coming out
       of this box are ones you can actually trust."</div>
@@ -244,8 +244,8 @@
     <li><span class="click-label">CLICK</span> the <strong>SAP Purchasing</strong> domain card.
       <div class="show">The domain page with <strong>two subdomain cards</strong>: "Sourcing &amp; Supplier Risk"
       and "Purchase Order Analytics." Below them, the <strong>curated sections</strong> — shared assets
-      (MATERIAL, SUPPLIER, VALUE_DICTIONARY), the two Genie spaces, and the App.</div>
-      <div class="say">"Two subdomains mirror the two Genie spaces we'll demo later. The shared tables
+      (MATERIAL, SUPPLIER, VALUE_DICTIONARY), the two Genie Agents, and the App.</div>
+      <div class="say">"Two subdomains mirror the two Genie Agents we'll demo later. The shared tables
       (material, supplier, value dictionary) sit at the parent level because both subdomains use them."</div>
     </li>
     <li><span class="click-label">CLICK</span> the <strong>Sourcing &amp; Supplier Risk</strong> subdomain card.
@@ -331,7 +331,7 @@
     <li><span class="click-label">CLICK</span> the <strong>Lineage</strong> tab on a gold table (e.g.
       <code class="inline">SOURCING</code>), then open the <strong>Lineage graph</strong>.
       <div class="show">The upstream <code class="inline">RAW_*</code> tables → the gold table → downstream
-      consumers (the metric views, Genie spaces, and the App). Click a node to expand, and switch to
+      consumers (the metric views, Genie Agents, and the App). Click a node to expand, and switch to
       <strong>column-level lineage</strong> to trace a single field (e.g. how IS_VALID_SOURCE is derived).</div>
       <div class="say">"Every gold table carries automatic, end-to-end lineage — you can prove exactly which raw
       SAP fields feed a KPI, which is gold for audit and impact analysis."</div>
@@ -349,7 +349,7 @@
     <li><span class="click-label">CLICK</span> a <strong>metric view</strong> such as
       <code class="inline">mv_delivery_performance</code> and open its definition.
       <div class="say">"KPIs like on-time-delivery rate are defined once as a metric view, so every
-      dashboard, Genie space, and app computes them identically. No metric drift."</div>
+      dashboard, Genie Agent, and app computes them identically. No metric drift."</div>
     </li>
   </ol>
   <div class="tip">Don't dwell on SQL here. The message is <strong>governance</strong>: documented tables,
@@ -434,27 +434,42 @@
       vendors for the same material?</span> — a quick sourcing-savings angle.
     </li>
   </ol>
-  <div class="say">"Two focused spaces, each an expert in its domain. But I don't want a business user to
-  pick the right space — so we put a supervisor in front."</div>
+  <div class="say">"Two focused Genie Agents, each an expert in its domain. But I don't want a business user to
+  pick the right one — so we put a supervisor in front."</div>
 
   <!-- ============================================================ -->
-  <h2 id="mas">7 · Agent Bricks — the Multi-Agent Supervisor <span class="clock">3 min</span></h2>
-  <p>Left nav → <strong>Agents</strong> (Agent Bricks) → open <strong>"sap_purchasing_supervisor."</strong></p>
+  <h2 id="mas">7 · Agent Bricks — the supervisor agent over both Genie Agents <span class="clock">3 min</span></h2>
+  <p>Open the demo folder → <strong>06_agent/supervisor</strong>, then <strong>Compute → Apps →
+  "agent-bricks-sap-supervisor."</strong></p>
   <ol class="clicks">
-    <li><span class="click-label">SHOW</span> the supervisor's config.
-      <div class="show">The <strong>two agents</strong> it orchestrates (Sourcing &amp; Supplier Risk, Purchase
-      Order Analytics) and the <strong>routing instructions</strong>.</div>
+    <li><span class="click-label">SHOW</span> <code class="inline">agent.toml</code> and
+      <code class="inline">agent/agent.py</code>.
+      <div class="show">The two <strong>Genie Agent tools</strong> it orchestrates
+      (<code class="inline">sourcing_supplier_risk</code>, <code class="inline">purchase_order_analytics</code>,
+      bound with <code class="inline">agentbricks tools add genie-agent</code>) and the
+      <strong>routing rules</strong> in the system prompt.</div>
+      <div class="say">"The routing is a short prompt and two tool bindings, in our Git repo. We review it,
+      version it and test it like any other code. And it's the path Databricks recommends now: the older
+      no-code Supervisor Agent is a legacy product."</div>
     </li>
-    <li><span class="click-label">CLICK</span> the built-in <strong>playground / test</strong> panel. Ask a
-      cross-domain question: <span class="ask">Do we have single-sourced risky materials that we also
-      placed purchase orders for recently?</span>
-      <div class="show">The <strong>trace</strong>: the supervisor routes to the right agent(s), each runs its
-      Genie space, and the answer is combined — one endpoint, both domains.</div>
-      <div class="say">"The business user just asks. The supervisor decides who answers. This is the single
-      brain the app will talk to."</div>
+    <li><span class="click-label">SHOW</span> the app <strong>agent-bricks-sap-supervisor</strong>.
+      <div class="show">It runs on <strong>Agent Runtime</strong> (<code class="inline">DurableAgentServer</code>),
+      deployed by <code class="inline">agentbricks deploy</code> from <code class="inline">06a</code>, with its own
+      service principal that has CAN_RUN on both Genie Agents.</div>
     </li>
-    <li><span class="click-label">SHOW</span> (optional) the <strong>serving endpoint</strong> under
-      Serving — it's deployed and queryable like any model endpoint.
+    <li><span class="click-label">ASK</span> in the App's <strong>Chat (Supervisor)</strong> tab a cross-domain
+      question: <span class="ask">Did we place purchase orders with suppliers that are the only source of a
+      material and carry delivery risk?</span>
+      <div class="show">The answer names both Genie Agents. Then open the MLflow experiment
+      <strong>/Shared/agentbricks_traces/sap-purchasing-supervisor</strong> and the latest <strong>trace</strong>:
+      the supervisor asks Sourcing &amp; Supplier Risk for the suppliers first, then asks Purchase Order
+      Analytics about exactly those suppliers.</div>
+      <div class="say">"The business user just asks. The supervisor decides who answers, and in which order.
+      This is the single brain the app talks to."</div>
+    </li>
+    <li><span class="click-label">SHOW</span> (optional) the <strong>benchmark</strong> table
+      <code class="inline">_BENCHMARK_RESULTS</code>: accuracy against known-good SQL, plus a
+      <strong>routing</strong> check for every question.
     </li>
   </ol>
   <!-- ============================================================ -->
@@ -620,10 +635,10 @@
       <div class="say">"Every number here comes from the same governed metric views and functions we saw in
       the catalog — the app isn't its own source of truth, it's a window onto the governed layer."</div>
     </li>
-    <li><span class="click-label">CLICK</span> the <strong>Chat (MAS)</strong> tab. Click a sample question
+    <li><span class="click-label">CLICK</span> the <strong>Chat (Supervisor)</strong> tab. Click a sample question
       chip, or type <span class="ask">Which suppliers have the worst on-time delivery?</span>
-      <div class="show">The answer streams back with a <strong>"routed to …"</strong> badge showing which agent
-      the supervisor picked.</div>
+      <div class="show">The answer comes back with a <strong>"routed to …"</strong> badge showing which Genie
+      Agent(s) the supervisor asked.</div>
       <div class="say">"Same intelligence as Genie, embedded where the business already works — behind our
       own branding, our own screen."</div>
     </li>
@@ -644,7 +659,7 @@
 
   <h3>11a · Insight: the question we already know</h3>
   <ol class="clicks">
-    <li><span class="click-label">ASK</span> in Genie space 1 (Sourcing &amp; Supplier Risk):
+    <li><span class="click-label">ASK</span> in Genie Agent 1 (Sourcing &amp; Supplier Risk):
       <span class="ask">Which materials are single-sourced and their sole supplier has a delivery-risk flag?</span>
       <div class="show">13 material/plant combinations. Same answer as in section 5.</div>
       <div class="say">"This is the list. Now let's act on it."</div>
@@ -697,7 +712,7 @@
 
   <h3>11d · Closed loop: Genie sees the actions live</h3>
   <ol class="clicks">
-    <li><span class="click-label">ASK</span> in Genie space 1:
+    <li><span class="click-label">ASK</span> in Genie Agent 1:
       <span class="ask">Which single-sourced risky materials have no open mitigation case?</span>
       <div class="show">Genie calls the trusted function
       <code class="inline">single_sourced_risky_without_open_case()</code>. The answer has <strong>9 rows</strong>,

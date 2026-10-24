@@ -23,9 +23,9 @@
 # MAGIC 5. `04_resources/04a_resources`       — ensure warehouse + grant UC permissions.
 # MAGIC 6. `10_lakebase/10a_create_lakebase`  — Lakebase project, case tables, seed data, UC catalog, case functions.
 # MAGIC    `10_lakebase/10b_sync_worklist`    — RISK_WORKLIST → Lakebase synced table; case snapshot → Delta.
-# MAGIC 7. `05_genie/05a_create_genie_spaces` — create the 2 Genie spaces + instructions (incl. case functions).
-# MAGIC 8. `06_agent/06a_create_mas`          — create the Agent Bricks MAS + endpoint.
-# MAGIC 9. `07_benchmark/07a_benchmark`       — run the accuracy benchmark.
+# MAGIC 7. `05_genie/05a_create_genie_spaces` — create the 2 Genie Agents + instructions (incl. case functions).
+# MAGIC 8. `06_agent/06a_deploy_supervisor`   — deploy the supervisor agent over both Genie Agents (Agent Bricks CLI).
+# MAGIC 9. `07_benchmark/07a_benchmark`       — run the accuracy + routing benchmark.
 # MAGIC 10. `app/deploy_app`                  — create & deploy the Databricks App (charts, chat, cases).
 # MAGIC 11. `08_jobs/08a_create_jobs`         — register the multi-task Lakeflow Job and run it once.
 # MAGIC 12. `09_domains/09a_create_domains`   — create governed tags, Discover domains & subdomains.
@@ -182,30 +182,33 @@ run_child("./10_lakebase/10b_sync_worklist")     # Delta worklist -> Lakebase sy
 
 # COMMAND ----------
 
-# DBTITLE 1,Step 7 — Genie spaces & MAS
+# DBTITLE 1,Step 7 — Genie Agents & supervisor
 # MAGIC %md
-# MAGIC ## 7) Create the 2 Genie spaces + Agent Bricks MAS
-# MAGIC Genie spaces must exist before the MAS, and the MAS waits for its serving
-# MAGIC endpoint to reach READY (may take a few minutes).
+# MAGIC ## 7) Create the 2 Genie Agents + the supervisor agent
+# MAGIC The Genie Agents must exist before the supervisor: 06a binds them as tools
+# MAGIC (`agentbricks tools add genie-agent`) and deploys the agent to Agent Runtime with
+# MAGIC `agentbricks deploy` (a few minutes on the first run). This replaces the legacy
+# MAGIC Supervisor Agent (MAS).
 
 # COMMAND ----------
 
 # DBTITLE 1,Run 05a + 06a
-run_child("./05_genie/05a_create_genie_spaces")  # 2 domain-split Genie spaces
-run_child("./06_agent/06a_create_mas")            # Agent Bricks MAS + serving endpoint
+run_child("./05_genie/05a_create_genie_spaces")  # 2 domain-split Genie Agents
+run_child("./06_agent/06a_deploy_supervisor")    # supervisor agent on Agent Runtime
 
 # COMMAND ----------
 
 # DBTITLE 1,Step 8 — Benchmark & App
 # MAGIC %md
 # MAGIC ## 8) Benchmark & App deployment
-# MAGIC Benchmark validates accuracy against known-good SQL (and optionally queries the
-# MAGIC MAS). The App gets the charts, the MAS chat and the Lakebase cases tab.
+# MAGIC Benchmark validates accuracy against known-good SQL and asks the supervisor every
+# MAGIC question (accuracy + routing). The App gets the charts, the supervisor chat and the
+# MAGIC Lakebase cases tab.
 
 # COMMAND ----------
 
 # DBTITLE 1,Run 07a + deploy_app
-run_child("./07_benchmark/07a_benchmark")    # accuracy benchmark
+run_child("./07_benchmark/07a_benchmark")    # accuracy + routing benchmark
 run_child("./app/deploy_app")               # Databricks App (React + FastAPI + Lakebase)
 
 # COMMAND ----------
@@ -226,7 +229,7 @@ run_child("./08_jobs/08a_create_jobs", timeout=7200)  # create + run the Lakeflo
 # DBTITLE 1,Step 10 — Discover domains
 # MAGIC %md
 # MAGIC ## 10) Create Discover domains & subdomains (tags + asset tagging + publish)
-# MAGIC Organises gold tables, metric views, functions, and Genie spaces into a
+# MAGIC Organises gold tables, metric views, functions, and Genie Agents into a
 # MAGIC business-aligned hierarchy on the Discover page.
 # MAGIC
 # MAGIC > **Pages** (business glossary) are in a separate notebook `09b_create_pages`.
@@ -580,11 +583,11 @@ displayHTML("""
 # MAGIC %md
 # MAGIC ## Done — full deployment complete
 # MAGIC All data, semantics, Lakebase (cases + synced worklist + UC catalog), Genie
-# MAGIC spaces, MAS endpoint, benchmark, App, the Lakeflow Job (with one completed run)
+# MAGIC Agents, the supervisor agent, benchmark, App, the Lakeflow Job (with one completed run)
 # MAGIC and Discover domains have been deployed. Run `99_teardown` to clean up
 # MAGIC when you're done.
 
 # COMMAND ----------
 
 # DBTITLE 1,Cell 15
-dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Lakebase + Genie + MAS + benchmark + App + Lakeflow Job + domains).")
+dbutils.notebook.exit("00_run_all: SUCCESS — full deployment (data + semantics + Lakebase + Genie + supervisor + benchmark + App + Lakeflow Job + domains).")

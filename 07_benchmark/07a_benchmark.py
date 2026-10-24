@@ -8,10 +8,16 @@
 # MAGIC Two levels of evaluation:
 # MAGIC 1. **Known-good SQL sanity** — every known-good SQL must execute and return a
 # MAGIC    non-empty / valid result. This validates the gold layer + trusted functions.
-# MAGIC 2. **Genie / MAS accuracy** *(optional, on by default)* — ask each NL question to
-# MAGIC    the MAS endpoint, extract the SQL/result it produced, and compare the result
-# MAGIC    **signature** (row count or scalar) against the known-good SQL. Prints a
-# MAGIC    per-question pass/fail table and an overall accuracy percentage.
+# MAGIC 2. **Supervisor accuracy** *(optional, on by default)* — ask each NL question to
+# MAGIC    the Agent Bricks supervisor (06a), take the SQL the Genie Agent ran, re-run it,
+# MAGIC    and compare the result **signature** (row count or scalar) against the
+# MAGIC    known-good SQL. Also checks **routing**: did the supervisor ask the Genie Agent
+# MAGIC    that owns the question (`space` in the YAML)? Prints a per-question pass/fail
+# MAGIC    table and an overall accuracy percentage.
+# MAGIC
+# MAGIC The supervisor runs **in-process** (same graph, system prompt, Genie tools and model
+# MAGIC as the deployed app), under this notebook's identity. Calling the deployed URL is not
+# MAGIC possible from a notebook: Databricks Apps only accept OAuth tokens.
 # MAGIC
 # MAGIC The question set lives in `benchmark_questions.yaml` (single source of truth).
 
@@ -21,14 +27,14 @@
 
 # COMMAND ----------
 
+# MAGIC %run ../06_agent/_agentbricks_helpers
+
+# COMMAND ----------
+
 import os
-import requests
-from databricks.sdk import WorkspaceClient
 
-w = WorkspaceClient()
-
-# Toggle the (slower) live MAS evaluation. Known-good SQL always runs.
-RUN_MAS_EVAL = True
+# Toggle the (slower) live supervisor evaluation. Known-good SQL always runs.
+RUN_AGENT_EVAL = True
 
 # COMMAND ----------
 
@@ -96,121 +102,147 @@ print(f"\nKnown-good SQL: {sql_ok}/{len(QUESTIONS)} produced valid results.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Helper: ask the MAS endpoint (Responses API) and get result rows
-# MAGIC The MAS returns the answer as a markdown table in an assistant message. We also
-# MAGIC try to recover the underlying SQL from the function-call trace so we can compare
-# MAGIC result signatures robustly (by re-running that SQL).
+# MAGIC ## Ask the supervisor every question (in-process)
+# MAGIC Prepares the same project copy 06a deploys (Genie Agent tools bound), installs its
+# MAGIC dependencies into a separate folder and runs `eval/ask.py` in a subprocess with them. Each answer is
+# MAGIC the turn's message list, the same shape as the deployed `/api/invocations` output.
 
 # COMMAND ----------
 
-mas_row = spark.table(CFG.fq("_MAS_ENDPOINT")).first()
-MAS_ENDPOINT = mas_row["endpoint_name"] if mas_row else None
-print(f"MAS endpoint: {MAS_ENDPOINT}")
+import json
+import subprocess
+import sys
 
-
-def ask_mas(question, timeout=180):
-    headers = w.config.authenticate()
-    url = f"{w.config.host}/serving-endpoints/{MAS_ENDPOINT}/invocations"
-    r = requests.post(url, headers=headers, json={"input": [{"role": "user", "content": question}]}, timeout=timeout)
-    r.raise_for_status()
-    return r.json().get("output", [])
-
-
-def count_markdown_rows(text):
-    """Count data rows in a markdown table (excludes header + separator).
-
-    The MAS renders results as a markdown table whose first column is a 0-based row
-    index, e.g.:  ``||MATNR|WERKS|...``  /  ``|-|-|-|``  /  ``|0|MAT100000|...``.
-    We count pipe rows, drop the separator row(s) (only dashes/colons), then subtract
-    one for the header row.
-    """
-    pipe_rows = [ln for ln in text.splitlines() if ln.strip().startswith("|")]
-    non_sep = [ln for ln in pipe_rows if not set(ln.replace("|", "").strip()) <= set("-: ")]
-    return max(0, len(non_sep) - 1)  # minus header row
-
-
-def mas_result_signature(output, signature):
-    """Derive a comparable signature from the MAS output.
-
-    The MAS may return several assistant messages: routing tags (<name>..</name>),
-    a markdown table with the raw rows, and a natural-language summary. We pick the
-    message that actually contains a markdown TABLE (has pipe rows) for row counting,
-    and for scalars we parse the table cell or fall back to a number in the prose.
-    """
-    texts = []
-    for item in output:
-        if item.get("type") == "message":
-            for c in item.get("content", []):
-                if c.get("type") == "output_text":
-                    txt = c["text"]
-                    if not txt.startswith("<name>"):  # skip routing tags
-                        texts.append(txt)
-    # Prefer the message containing a markdown table.
-    table_text = next((t for t in texts if "|" in t and "-" in t), texts[-1] if texts else "")
-    if signature == "rowcount":
-        return count_markdown_rows(table_text), table_text
-    # scalar: take the last cell of the first data row, else first number in prose
-    rows = [ln for ln in table_text.splitlines() if ln.strip().startswith("|")]
-    if len(rows) >= 3:
-        cells = [c.strip() for c in rows[2].strip("|").split("|") if c.strip()]
-        if cells:
-            return cells[-1], table_text
-    import re as _re
-    all_text = " ".join(texts)
-    m = _re.findall(r"-?\d+\.?\d*", all_text)
-    return (m[-1] if m else None), all_text
-
+answers = {}
+if RUN_AGENT_EVAL:
+    spaces = {r["space_key"]: r["space_id"] for r in spark.table(CFG.fq("_GENIE_SPACES")).collect()}
+    env = ensure_agentbricks_cli()
+    project = prepare_supervisor_project(f"{demo_root()}/06_agent/supervisor", f"{WORK_DIR}/sap_supervisor_eval",
+                                         spaces, CFG.model, env=env)
+    pythonpath = ensure_agent_pkgs(project)
+    env = dict(env, SUPERVISOR_MODEL=CFG.model, AGENTBRICKS_PROJECT_ROOT=project, PYTHONPATH=pythonpath)
+    proc = subprocess.run([sys.executable, "eval/ask.py"], input=json.dumps([q["question"] for q in QUESTIONS]),
+                          capture_output=True, text=True, cwd=project, env=env, timeout=3600)
+    for line in proc.stdout.splitlines():
+        if line.startswith('{"question"'):
+            rec = json.loads(line)
+            answers[rec["question"]] = rec
+    print(f"Supervisor answered {len(answers)}/{len(QUESTIONS)} questions (rc={proc.returncode}).")
+    if proc.returncode != 0 or not answers:
+        print(proc.stderr[-4000:])
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Level 2 — MAS accuracy vs known-good
-# MAGIC We compare row counts with a small tolerance (Genie may cap/format differently)
-# MAGIC and scalars by approximate string/number match. This yields a demoable accuracy
-# MAGIC score without being brittle to formatting.
+# MAGIC ## Helpers: read routing, Genie SQL and the answer from the message list
 
 # COMMAND ----------
 
 import re
 
+GENIE_TOOLS = ("sourcing_supplier_risk", "purchase_order_analytics")
+
+
+def parse_turn(output):
+    """Return (agents asked, Genie SQL statements in order, final answer text)."""
+    agents, sqls, answer = [], [], ""
+    for m in output:
+        if m.get("type") == "ai":
+            for tc in m.get("tool_calls") or []:
+                agent = next((g for g in GENIE_TOOLS if tc.get("name", "").startswith(g)), None)
+                if agent and agent not in agents:
+                    agents.append(agent)
+            content = m.get("content")
+            if isinstance(content, list):
+                content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
+            if content and not m.get("tool_calls"):
+                answer = content
+        elif m.get("type") == "tool":
+            try:
+                result = json.loads(m.get("content") or "{}")
+            except Exception:
+                continue
+            for att in result.get("attachments") or []:
+                q = (att.get("query") or {}).get("query")
+                if q:
+                    sqls.append(q)
+    return agents, sqls, answer
+
+
+def agent_signature(sqls, answer, signature):
+    """Re-run the last SQL the Genie Agent executed; fall back to the answer text."""
+    if sqls:
+        try:
+            rows = spark.sql(sqls[-1]).collect()
+            if signature == "rowcount":
+                return len(rows), "genie_sql"
+            if len(rows) == 1:
+                nums = [v for v in rows[0] if isinstance(v, (int, float)) or type(v).__name__ == "Decimal"]
+                if nums:
+                    return float(nums[0]), "genie_sql"
+        except Exception as e:
+            print(f"    (could not re-run Genie SQL: {str(e)[:120]})")
+    if signature == "rowcount":
+        pipe_rows = [ln for ln in answer.splitlines() if ln.strip().startswith("|")]
+        non_sep = [ln for ln in pipe_rows if not set(ln.replace("|", "").strip()) <= set("-: ")]
+        return max(0, len(non_sep) - 1), "answer_table"
+    m = re.findall(r"-?\d+\.?\d*", answer)
+    return (float(m[0]) if m else None), "answer_text"
+
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Level 2 — supervisor accuracy vs known-good
+# MAGIC Row counts must match exactly. If they differ but both are non-zero, the question
+# MAGIC is counted as a **lenient** pass and flagged in `note`, so exact and lenient passes
+# MAGIC can be reported separately. Scalars match within 5% (or 1.0), also accepting a
+# MAGIC rate given as a percent instead of a fraction.
+
+# COMMAND ----------
+
 results = []
-if RUN_MAS_EVAL and MAS_ENDPOINT:
+if answers:
     for q in QUESTIONS:
         kg = known_good.get(q["id"], {})
+        rec = answers.get(q["question"], {"output": [], "error": "no answer"})
+        agents, sqls, answer = parse_turn(rec["output"])
         row = {"id": q["id"], "question": q["question"], "signature": q["signature"],
-               "known_good": kg.get("value"), "mas": None, "match": False, "note": ""}
-        try:
-            out = ask_mas(q["question"])
-            mas_sig, _text = mas_result_signature(out, q["signature"])
-            row["mas"] = mas_sig
-            if q["signature"] == "rowcount" and isinstance(kg.get("value"), int) and isinstance(mas_sig, int):
-                # allow small tolerance (Genie sometimes returns a preview subset)
-                row["match"] = (mas_sig == kg["value"]) or (mas_sig > 0 and kg["value"] > 0)
-                row["note"] = "" if mas_sig == kg["value"] else "non-zero match (preview subset)"
+               "known_good": kg.get("value"), "agent": None, "match": False, "exact": False,
+               "routed_to": ",".join(agents), "routing_ok": q.get("space") in agents,
+               "genie_sql": sqls[-1] if sqls else "", "note": rec.get("error") or ""}
+        if not rec.get("error"):
+            val, source = agent_signature(sqls, answer, q["signature"])
+            row["agent"] = val
+            if q["signature"] == "rowcount" and isinstance(kg.get("value"), int) and isinstance(val, int):
+                row["exact"] = val == kg["value"]
+                row["match"] = row["exact"] or (val > 0 and kg["value"] > 0)
+                row["note"] = f"from {source}" + ("" if row["exact"] else "; lenient non-zero match")
             else:  # scalar
                 def num(x):
                     m = re.findall(r"-?\d+\.?\d*", str(x))
                     return float(m[0]) if m else None
-                a, b = num(kg.get("value")), num(mas_sig)
-                # Accept a rate expressed either as a fraction (0.72) or a percent (72.0):
-                # normalize by also comparing b/100 and b*100 to a.
+
                 def close(x, y):
                     return x is not None and y is not None and abs(x - y) <= max(1.0, 0.05 * abs(x))
+                a, b = num(kg.get("value")), num(val)
+                row["exact"] = close(a, b)
                 row["match"] = bool(a is not None and b is not None and
                                     (close(a, b) or close(a, b / 100.0) or close(a, b * 100.0)))
-                if row["match"] and not close(a, b):
-                    row["note"] = "matched (percent/fraction normalized)"
-        except Exception as e:
-            row["note"] = f"MAS error: {e}"
+                row["note"] = f"from {source}" + ("; percent/fraction normalized" if row["match"] and not row["exact"] else "")
         results.append(row)
-        print(f"  {q['id']:<5} kg={row['known_good']} mas={row['mas']} "
-              f"{'✓' if row['match'] else '✗'} {row['note']}")
+        print(f"  {q['id']:<5} kg={row['known_good']} agent={row['agent']} "
+              f"{'✓' if row['match'] else '✗'}{'' if row['exact'] else '~'} "
+              f"routed={row['routed_to'] or '-'} {'✓' if row['routing_ok'] else '✗'}  {row['note']}")
 
     passed = sum(1 for r in results if r["match"])
-    accuracy = 100.0 * passed / len(results) if results else 0.0
-    print(f"\n===== MAS ACCURACY: {passed}/{len(results)} = {accuracy:.1f}% =====")
+    exact = sum(1 for r in results if r["exact"])
+    routed = sum(1 for r in results if r["routing_ok"])
+    accuracy = 100.0 * passed / len(results)
+    print(f"\n===== SUPERVISOR ACCURACY: {passed}/{len(results)} = {accuracy:.1f}% "
+          f"(exact {exact}/{len(results)}, routing {routed}/{len(results)}) =====")
 else:
-    print("MAS eval disabled or endpoint missing — Level 1 (known-good SQL) only.")
+    print("Supervisor eval disabled or no answers — Level 1 (known-good SQL) only.")
 
 # COMMAND ----------
 
@@ -223,13 +255,15 @@ from pyspark.sql import Row
 
 if results:
     score_rows = [Row(id=r["id"], question=r["question"], signature=r["signature"],
-                      known_good=str(r["known_good"]), mas=str(r["mas"]),
-                      match=bool(r["match"]), note=r["note"]) for r in results]
+                      known_good=str(r["known_good"]), agent=str(r["agent"]),
+                      match=bool(r["match"]), exact=bool(r["exact"]),
+                      routed_to=r["routed_to"], routing_ok=bool(r["routing_ok"]),
+                      genie_sql=r["genie_sql"], note=r["note"]) for r in results]
     (spark.createDataFrame(score_rows)
         .write.format("delta").mode("overwrite").option("overwriteSchema", "true")
         .saveAsTable(CFG.fq("_BENCHMARK_RESULTS")))
     display(spark.table(CFG.fq("_BENCHMARK_RESULTS")))
-    acc = 100.0 * sum(1 for r in results if r["match"]) / len(results)
-    dbutils.notebook.exit(f"07a_benchmark: SUCCESS — accuracy={acc:.1f}% over {len(results)} questions.")
+    dbutils.notebook.exit(f"07a_benchmark: SUCCESS — accuracy={accuracy:.1f}% ({passed}/{len(results)}, "
+                          f"exact {exact}, routing {routed}) over {len(results)} questions.")
 else:
-    dbutils.notebook.exit(f"07a_benchmark: SUCCESS — {sql_ok}/{len(QUESTIONS)} known-good SQL valid (MAS eval off).")
+    dbutils.notebook.exit(f"07a_benchmark: SUCCESS — {sql_ok}/{len(QUESTIONS)} known-good SQL valid (agent eval off).")

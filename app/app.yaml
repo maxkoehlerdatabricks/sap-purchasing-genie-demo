@@ -2,7 +2,7 @@
 # Databricks App manifest — SAP Purchasing demo app.
 # Runs a FastAPI backend that (1) serves the built React frontend as static files,
 # (2) queries the gold layer / metric views via the SQL warehouse for the charts,
-# (3) proxies the chat tab to the MAS serving endpoint (Responses API), and
+# (3) sends the chat tab to the supervisor agent app (Agent Bricks CLI), and
 # (4) reads/writes mitigation cases in Lakebase (Postgres) for the cases tab.
 # ============================================================================
 command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
@@ -12,12 +12,10 @@ env:
   # below AND surfaced here as an env var the backend reads.
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
-  # The MAS serving endpoint powering the chat tab. Derived from the app resource
-  # named "mas-endpoint" (wired in deploy_app.py from the _MAS_ENDPOINT table), so it
-  # always matches the currently-deployed endpoint even after the MAS is recreated
-  # (the endpoint name changes on each recreation).
-  - name: MAS_ENDPOINT_NAME
-    valueFrom: mas-endpoint
+  # URL of the supervisor agent app (agent-bricks-sap-supervisor) powering the chat
+  # tab. Set by app/deploy_app from the _SUPERVISOR table written by 06a.
+  - name: SUPERVISOR_URL
+    value: ""
   # Fully-qualified schema the charts read from, and the Lakebase coordinates for the
   # Mitigation cases tab. NOTE: app/deploy_app passes ALL of these as deployment
   # env_vars from 00_config (overriding this file), so the values below are only

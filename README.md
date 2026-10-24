@@ -10,16 +10,19 @@ It builds, end-to-end and on a blank workspace:
   table & column comments).
 - A **semantic layer**: parameterized **SQL functions** (trusted assets), **UC metric
   views**, and a **value dictionary**.
-- **2 Genie spaces** (domain-split) with **all instruction types** (ontology snippets)
-  + certified answers.
-- An **Agent Bricks Multi-Agent Supervisor (MAS)** over the two spaces, deployed as a
-  serving endpoint.
+- **2 Genie Agents** (formerly Genie spaces; domain-split) with **all instruction types**
+  (ontology snippets) + certified answers.
+- A **supervisor agent** over the two Genie Agents, built with the **Agent Bricks CLI**
+  (LangGraph, `DurableAgentServer`) and deployed to **Agent Runtime** as the app
+  `agent-bricks-sap-supervisor`, with MLflow tracing. It replaces the legacy Supervisor
+  Agent (MAS): Supervisor Agent is a legacy offering and the Supervisor API reached end of
+  life on Sep 30, 2026.
 - **Governed tags**, **Discover domains/subdomains**, and **5 governed Pages** (business
   glossary) — the ontology layer that Genie One reads.
 - A **benchmark** of representative questions with known-good SQL and an **accuracy
   score**.
 - A **Databricks App** (React + FastAPI) with visualizations, a chat interface over
-  the MAS, and a **Mitigation cases** tab where buyers act on the risks.
+  the supervisor agent, and a **Mitigation cases** tab where buyers act on the risks.
 - A **Lakebase** (managed Postgres) operational layer: the risk worklist is synced from
   Delta into Lakebase, the App writes mitigation cases there, and a **Unity Catalog
   catalog over Lakebase** lets Genie read the cases live (closed loop).
@@ -66,10 +69,11 @@ SUPPLIER_RISK           ─ Workflow D ─▶  SUPPLIER_RISK (LIFNR, time)│   
 EKKO, EKPO, EKBE        ─ Workflow E ─▶  PURCHASE_ORDER (EBELN+EBELP)┘
                                               │
                           ┌───────────────────┴────────────────────┐
-                    Genie Space 1                              Genie Space 2
+                    Genie Agent 1                              Genie Agent 2
               Sourcing & Supplier Risk                    Purchase Order Analytics
                           └───────────────────┬────────────────────┘
-                                    Agent Bricks MAS (serving endpoint)
+                     Supervisor agent (Agent Bricks CLI, on Agent Runtime)
+                     tools: sourcing_supplier_risk / purchase_order_analytics
                                                │
                                        Databricks App
                          (Visualizations + Chat + Mitigation cases)
@@ -85,7 +89,7 @@ EKKO, EKPO, EKBE        ─ Workflow E ─▶  PURCHASE_ORDER (EBELN+EBELP)┘
                                                                 │
           UC catalog sap_purchasing_ops (registered over the Lakebase database, read live)
                                                                 │
-   single_sourced_risky_without_open_case() / open_mitigation_cases()  ──▶ Genie space 1 + MAS
+   single_sourced_risky_without_open_case() / open_mitigation_cases()  ──▶ Genie Agent 1 + supervisor
    Lakeflow Job snapshot ──▶ Delta MITIGATION_CASE_HISTORY
 ```
 
@@ -144,27 +148,31 @@ sap-purchasing-genie-demo/
   04_resources/
     04a_resources.py                # warehouse + permissions (Python SDK)
   05_genie/
-    05a_create_genie_spaces.py      # create 2 Genie spaces + all instruction types
+    05a_create_genie_spaces.py      # create 2 Genie Agents + all instruction types
     genie_instructions_space1.md    # instructions / ontology snippets (with "use first" recommendations)
     genie_instructions_space2.md
   06_agent/
-    06a_create_mas.py               # Agent Bricks MAS + serving endpoint
+    06a_deploy_supervisor.py        # bind both Genie Agents as tools + `agentbricks deploy`
+    _agentbricks_helpers.py         # installs the databricks CLI + Agent Bricks CLI on serverless
+    supervisor/                     # the Agent Bricks CLI project (LangGraph agent, agent.toml, app.yaml)
+      agent/agent.py                # routing system prompt + graph
+      eval/ask.py                   # in-process batch runner used by 07a
   07_benchmark/
-    07a_benchmark.py                # runs 16 questions vs known-good SQL → accuracy score
+    07a_benchmark.py                # 17 questions vs known-good SQL → accuracy + routing score
     benchmark_questions.yaml
   08_jobs/
     08a_create_jobs.py              # multi-task Lakeflow Job (raw → gold → DQ gate → semantics → Lakebase)
     08b_data_quality_gate.py        # DQ checks on the gold layer; task value for the condition task
   09_domains/
-    09a_create_domains.py           # governed tags + Discover domains/subdomains + asset tagging
-    09b_create_pages.py             # governed Pages (business glossary) — API or manual
+    09a_create_domains.ipynb        # governed tags + Discover domains/subdomains + asset tagging
+    09b_create_pages.ipynb          # governed Pages (business glossary) — API or manual
   10_lakebase/
     10a_create_lakebase.py          # Lakebase project, case tables, seed data, UC catalog, case functions
     10b_sync_worklist.py            # RISK_WORKLIST → Lakebase synced table; cases → MITIGATION_CASE_HISTORY
     data/buyers.csv                 # seed dataset: 6 buyers (one per material group + lead buyer)
     data/action_types.csv           # seed dataset: 6 mitigation actions with typical lead times
   app/                              # Databricks App (FastAPI + static frontend; backend/cases.py = Lakebase)
-  99_teardown.py                    # DELETE every asset (app, jobs, MAS, Genie, Lakebase, domains, tags, schemas)
+  99_teardown.py                    # DELETE every asset (apps, jobs, supervisor, Genie, Lakebase, domains, tags, schemas)
   demo_script.html                  # comprehensive demo walkthrough
 ```
 
@@ -173,7 +181,9 @@ sap-purchasing-genie-demo/
 ## How to run (blank workspace)
 
 **Prereqs:** a Unity Catalog you can write to, a serverless SQL warehouse, permission to
-create Genie spaces + Agent Bricks + serving endpoints + Apps.
+create Genie Agents + Databricks Apps (the supervisor runs as an app), and serverless
+compute with internet access (06a installs `databricks-agentbricks` from PyPI and the
+`databricks` CLI from its GitHub release).
 
 1. **Import** this folder into your workspace (Repos/Git folder, or
    `databricks workspace import-dir . /Workspace/Users/<you>/sap-purchasing-genie-demo`).
@@ -181,7 +191,7 @@ create Genie spaces + Agent Bricks + serving endpoints + Apps.
    `WAREHOUSE_ID` Python variables **once** at the top, then Run All. It orchestrates
    everything in order: raw simulation → gold Workflows A–E → constraints/comments →
    SQL functions → metric views → value dictionary → warehouse & permissions →
-   Lakebase (10a + 10b) → 2 Genie spaces → MAS + serving endpoint → benchmark →
+   Lakebase (10a + 10b) → 2 Genie Agents → supervisor agent (Agent Bricks CLI) → benchmark →
    Databricks App → Lakeflow Job (created and run once) → governed tags + Discover domains.
 
 Each child notebook can still be run individually (it reads the same parameters), but
@@ -197,8 +207,9 @@ mitigation cases to the 3 seed cases (10 risks without a case).
 
 ### Teardown
 Run `99_teardown.py` (top level, serverless) to delete **everything** the demo creates:
-the App, the Lakeflow Job (and the legacy data-prep job), the MAS + serving endpoint, both
-Genie spaces, the Lakebase synced table, the UC catalog over Lakebase and the Lakebase
+the App, the Lakeflow Job (and the legacy data-prep job), the supervisor agent with its
+Runtime Store and tracing experiment (plus a legacy MAS tile, if one is left), both
+Genie Agents, the Lakebase synced table, the UC catalog over Lakebase and the Lakebase
 project (purged), and the schemas `<schema>` and `<schema>_sync` (`DROP SCHEMA … CASCADE`,
 which removes all gold/raw tables, metric views, SQL functions and the `_*` metadata tables). Set `DELETE_DISCOVER = True` (the default) to also
 delete governed Pages, Discover domains, and governed tag policies; set it to `False` to keep
@@ -221,10 +232,10 @@ the **schema is created**.
 | Catalog | `max_kohler_demo_catalog` (existing) |
 | Schema | `purchasing_demo` (created) |
 | Warehouse | Serverless SQL Warehouse (`d7a3d1cfbba73c0a`) |
-| LLM | `databricks-claude-sonnet-4-5` |
-| Genie Space 1 | SAP Purchasing — Sourcing & Supplier Risk |
-| Genie Space 2 | SAP Purchasing — Purchase Order Analytics |
-| MAS endpoint | `sap-purchasing-mas` |
+| LLM (supervisor) | `system.ai.claude-sonnet-4-5` (AI Gateway) |
+| Genie Agent 1 | SAP Purchasing — Sourcing & Supplier Risk |
+| Genie Agent 2 | SAP Purchasing — Purchase Order Analytics |
+| Supervisor agent | `agent-bricks-sap-supervisor` (Databricks App on Agent Runtime) |
 | Lakebase project / database | `sap-purchasing-ops` / `purchasing_ops` (schema `ops`) |
 | UC catalog over Lakebase | `sap_purchasing_ops` |
 | Sync schema (Delta → Lakebase) | `purchasing_demo_sync` |
@@ -234,12 +245,14 @@ the **schema is created**.
 
 ## Verification checklist
 
-- `00_run_all` completes → full deployment (data, semantics, Genie, MAS, benchmark, Job, App).
+- `00_run_all` completes → full deployment (data, semantics, Genie, supervisor, benchmark, Job, App).
 - All 11 example questions return correct rows via the trusted SQL functions.
-- Both Genie spaces answer sample questions (and call the certified functions).
-- The MAS endpoint routes a question to the correct Genie space.
-- The benchmark prints a high accuracy score (target ≥ 90%).
-- The App loads: charts render; chat returns MAS answers.
+- Both Genie Agents answer sample questions (and call the certified functions).
+- The supervisor routes each question to the correct Genie Agent (`routing` in 07a).
+- The benchmark prints a high accuracy score (target ≥ 90%), with exact and lenient
+  passes reported separately.
+- The App loads: charts render; chat returns supervisor answers with the Genie Agent used
+  and the SQL Genie ran.
 - The **Mitigation cases** tab lists the 13-row worklist; creating a case drops "risks without
-  an active case" from 10 to 9, and Genie space 1 answers the closed-loop question with 9 rows.
+  an active case" from 10 to 9, and Genie Agent 1 answers the closed-loop question with 9 rows.
 - The Lakeflow Job run is green, including `data_quality_gate` and `sync_lakebase_worklist`.
