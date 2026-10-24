@@ -457,6 +457,14 @@
       deployed by <code class="inline">agentbricks deploy</code> from <code class="inline">06a</code>, with its own
       service principal that has CAN_RUN on both Genie Agents.</div>
     </li>
+    <li><span class="click-label">CLICK</span> the app URL. It opens the built-in <strong>Agent Bricks chat</strong>.
+      Ask <span class="ask">Which suppliers have the worst on-time delivery?</span>
+      <div class="show">The answer comes back with the tool calls it made
+      (<code class="inline">purchase_order_analytics_ask</code>, <code class="inline">…_query_result</code>).
+      The chat panel links to the MLflow traces.</div>
+      <div class="tip">A supervisor answer takes about 60–90 seconds, because it chains several Genie calls. Ask
+      the question first, then talk through <code class="inline">agent.toml</code> while it runs.</div>
+    </li>
     <li><span class="click-label">ASK</span> in the App's <strong>Chat (Supervisor)</strong> tab a cross-domain
       question: <span class="ask">Did we place purchase orders with suppliers that are the only source of a
       material and carry delivery risk?</span>

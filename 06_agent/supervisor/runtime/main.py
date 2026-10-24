@@ -1,4 +1,4 @@
-"""Run the LangGraph agent through Agent Bricks Runtime."""
+"""Run the LangGraph agent through Agent Bricks Runtime, with the Agent Bricks chat app at /."""
 
 import os
 from pathlib import Path
@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 from databricks_agentkit import DurableAgentServer
 from runtime.adapter import invoke, recover
+from runtime.ui import install_ui
 
 # override=False so injected DATABRICKS_* (from `agentbricks dev -p` or the deploy platform) win over a
 # checked-in .env.
@@ -19,6 +20,7 @@ configure()
 app = DurableAgentServer()
 app.invoke(invoke)
 app.recover(recover)
+install_ui(app)
 
 
 def main() -> None:

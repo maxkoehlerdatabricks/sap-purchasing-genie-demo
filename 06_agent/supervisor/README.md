@@ -30,7 +30,10 @@ agentbricks deploy sap-supervisor --source /tmp/supervisor
 
 ## Calling it
 
-`POST <app url>/api/invocations` with a Databricks **OAuth** token (Apps reject PATs and
+In a browser: open the app URL. `runtime/ui.py` + `ui/` serve the Agent Bricks chat app
+(no build step). Memory and Sessions show as off, because no stores are bound.
+
+From code: `POST <app url>/api/invocations` with a Databricks **OAuth** token (Apps reject PATs and
 notebook tokens):
 
 ```json
