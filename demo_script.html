@@ -457,23 +457,41 @@
       deployed by <code class="inline">agentbricks deploy</code> from <code class="inline">06a</code>, with its own
       service principal that has CAN_RUN on both Genie Agents.</div>
     </li>
-    <li><span class="click-label">CLICK</span> the app URL. It opens the built-in <strong>Agent Bricks chat</strong>.
-      Ask <span class="ask">Which suppliers have the worst on-time delivery?</span>
-      <div class="show">The answer comes back with the tool calls it made
-      (<code class="inline">purchase_order_analytics_ask</code>, <code class="inline">…_query_result</code>).
-      The chat panel links to the MLflow traces.</div>
-      <div class="tip">A supervisor answer takes about 60–90 seconds, because it chains several Genie calls. Ask
-      the question first, then talk through <code class="inline">agent.toml</code> while it runs.</div>
+    <li><span class="click-label">CLICK</span> the app URL. It opens the <strong>SAP Purchasing Assistant</strong>.
+      <div class="show">Two modes at the top: <strong>Supervisor</strong> (knows our SAP purchasing data) and
+      <strong>Normal AI chat</strong> (like ChatGPT, same AI model, no access to our data). The panel on the right
+      explains in plain words how the supervisor works and how it was built.</div>
+      <div class="say">"Same AI model on both buttons. The only difference is what it knows. On the left it is
+      wired to our experts and our governed data. On the right it is a general chatbot."</div>
     </li>
-    <li><span class="click-label">ASK</span> in the App's <strong>Chat (Supervisor)</strong> tab a cross-domain
-      question: <span class="ask">Did we place purchase orders with suppliers that are the only source of a
+    <li><span class="click-label">ASK</span> in <strong>Normal AI chat</strong>:
+      <span class="ask">Which suppliers have the worst on-time delivery?</span>
+      <div class="show">A polite general answer. It says it has no access to our delivery data and explains how
+      one could calculate it.</div>
+      <div class="say">"This is what a public chatbot gives you. Helpful, but it does not know our suppliers."</div>
+    </li>
+    <li><span class="click-label">ASK</span> the same question in <strong>Supervisor</strong>.
+      <div class="show">A table of our suppliers ranked by on-time delivery rate, with the source named on the
+      last line (Purchase Order Analytics).</div>
+      <div class="tip">A supervisor answer takes about a minute, because it asks the experts first. Ask, then
+      talk through <code class="inline">agent.toml</code> while it runs.</div>
+    </li>
+    <li><span class="click-label">ASK</span> in <strong>Supervisor</strong> a cross-domain question:
+      <span class="ask">Did we place purchase orders with suppliers that are the only source of a
       material and carry delivery risk?</span>
-      <div class="show">The answer names both Genie Agents. Then open the MLflow experiment
-      <strong>/Shared/agentbricks_traces/sap-purchasing-supervisor</strong> and the latest <strong>trace</strong>:
-      the supervisor asks Sourcing &amp; Supplier Risk for the suppliers first, then asks Purchase Order
-      Analytics about exactly those suppliers.</div>
+      <div class="show">The answer uses both experts: first the risky single-source suppliers from Sourcing &amp;
+      Supplier Risk, then the purchase orders with exactly those suppliers from Purchase Order Analytics.</div>
       <div class="say">"The business user just asks. The supervisor decides who answers, and in which order.
       This is the single brain the app talks to."</div>
+    </li>
+    <li><span class="click-label">SHOW</span> the <strong>traces</strong>: Machine Learning → Experiments →
+      <strong>/Shared/agentbricks_traces/sap-purchasing-supervisor</strong> → Traces.
+      <div class="show">One row per question. Each trace holds just the <strong>question</strong> and the
+      <strong>answer</strong>, named after the mode (<code class="inline">supervisor</code> or
+      <code class="inline">normal</code>). The tag <code class="inline">genie_agents</code> shows which experts
+      answered.</div>
+      <div class="say">"Every question and answer is recorded. That is the audit trail, and the base for
+      measuring quality over time."</div>
     </li>
     <li><span class="click-label">SHOW</span> (optional) the <strong>benchmark</strong> table
       <code class="inline">_BENCHMARK_RESULTS</code>: accuracy against known-good SQL, plus a

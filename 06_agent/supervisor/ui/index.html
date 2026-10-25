@@ -1,282 +1,173 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
-    <title>Agent Bricks Workbench</title>
-    <link rel="stylesheet" href="/ui-assets/styles.css?v=5" />
-  </head>
-  <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="brand-lockup">
-          <span class="brand-mark" aria-hidden="true">AB</span>
-          <div class="brand-copy">
-            <h1>Agent Bricks Workbench</h1>
-            <p class="brand-sub" id="brand-sub">LangGraph</p>
-          </div>
-        </div>
-        <div class="header-actions">
-          <div class="viewer-chip">
-            <p id="viewer-value">Loading viewer…</p>
-            <span class="avatar" id="viewer-avatar" aria-hidden="true"></span>
-          </div>
-        </div>
-      </header>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SAP Purchasing Assistant</title>
+  <script src="/ui/markdown-it-15.0.2.min.js"></script>
+  <style>
+    :root { --db-red:#FF3621; --db-navy:#1B3139; --db-green:#00A972; --db-teal:#00808C; --line:#e3e6ea; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#f6f7f9; color:var(--db-navy); }
+    header { background:var(--db-navy); color:#fff; padding:14px 24px; }
+    header h1 { margin:0; font-size:20px; }
+    header p { margin:4px 0 0; font-size:13px; color:#c9d3d8; }
+    .wrap { max-width:1280px; margin:0 auto; padding:16px; display:grid; grid-template-columns:1fr 380px; gap:16px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; }
+    .modes { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+    .mode { text-align:left; border:2px solid var(--line); background:#fff; border-radius:10px; padding:10px 12px; cursor:pointer; color:inherit; font:inherit; }
+    .mode b { display:block; font-size:15px; }
+    .mode span { font-size:12px; color:#5b6b73; }
+    .mode.active.supervisor { border-color:var(--db-teal); background:#eef8f8; }
+    .mode.active.normal { border-color:#8a96a0; background:#f2f4f6; }
+    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+    .chip { border:1px solid var(--line); background:#fff; border-radius:16px; padding:4px 10px; font-size:12px; cursor:pointer; }
+    #log { display:flex; flex-direction:column; gap:10px; min-height:340px; max-height:60vh; overflow:auto; padding:4px; }
+    .msg { padding:10px 14px; border-radius:10px; max-width:90%; font-size:14px; line-height:1.45; }
+    .msg.q { align-self:flex-end; background:var(--db-navy); color:#fff; white-space:pre-wrap; }
+    .msg.a { align-self:flex-start; background:#fff; border:1px solid var(--line); }
+    .msg.a.normal { background:#f2f4f6; }
+    .msg .tag { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-bottom:4px; }
+    .msg.a.supervisor .tag { color:var(--db-teal); }
+    .msg.a.normal .tag { color:#6b7780; }
+    .msg.err { border-color:var(--db-red); color:var(--db-red); }
+    .msg table { border-collapse:collapse; font-size:12px; margin:6px 0; }
+    .msg th, .msg td { border:1px solid var(--line); padding:3px 6px; text-align:left; }
+    .msg p { margin:4px 0; }
+    .composer { display:flex; gap:8px; margin-top:12px; }
+    .composer input { flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
+    .composer button { background:var(--db-red); color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; font-size:14px; }
+    .composer button:disabled { opacity:.5; cursor:default; }
+    .small { font-size:12px; color:#5b6b73; }
+    .link { background:none; border:none; color:var(--db-teal); cursor:pointer; padding:0; font-size:12px; text-decoration:underline; }
+    aside h2 { font-size:15px; margin:0 0 6px; }
+    aside h3 { font-size:13px; margin:14px 0 4px; color:var(--db-teal); }
+    aside h3.n { color:#6b7780; }
+    aside p, aside li { font-size:13px; line-height:1.45; }
+    aside ol { padding-left:18px; margin:4px 0; }
+    aside li { margin-bottom:4px; }
+    .flow { font-size:12px; background:#f6f7f9; border-radius:8px; padding:8px 10px; line-height:1.6; }
+    @media (max-width:900px) { .wrap { grid-template-columns:1fr; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>SAP Purchasing Assistant</h1>
+  <p>Ask a purchasing question in plain language. Choose how it should be answered.</p>
+</header>
 
-      <div class="trust-strip">
-        <span>AI-generated responses can be wrong. Verify important output.</span>
-      </div>
-
-      <main class="workspace">
-        <aside class="left-rail" aria-label="Runtime configuration">
-          <section class="rail-section left-card">
-            <div class="card-block capabilities-block" id="capabilities-block">
-              <div class="panel-subhead">
-                <h2>Capabilities</h2>
-                <div class="subhead-actions">
-                  <button id="refresh-config" class="icon-button" type="button" aria-label="Refresh capabilities">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="capability-list">
-                <div class="capability-item" data-capability="streaming">
-                  <button class="capability" type="button" aria-expanded="false">
-                    <span class="capability-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z"/></svg></span>
-                    <span class="capability-copy"><strong>Streaming</strong><small id="streaming-mode-value">Checking…</small></span>
-                    <span id="streaming-status" class="status-orb"></span>
-                    <svg class="capability-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
-                  </button>
-                  <div class="capability-detail" hidden></div>
-                </div>
-                <div class="capability-item" data-capability="background">
-                  <button class="capability" type="button" aria-expanded="false">
-                    <span class="capability-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-                    <span class="capability-copy"><strong>Background runs</strong><small id="background-mode-value">Checking…</small></span>
-                    <span id="background-status" class="status-orb"></span>
-                    <svg class="capability-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
-                  </button>
-                  <div class="capability-detail" hidden></div>
-                </div>
-                <div class="capability-item" data-capability="session">
-                  <button class="capability" type="button" aria-expanded="false">
-                    <span class="capability-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span>
-                    <span class="capability-copy"><strong>Sessions</strong><small id="session-mode-value">Checking…</small></span>
-                    <span id="session-status" class="status-orb"></span>
-                    <svg class="capability-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
-                  </button>
-                  <div class="capability-detail" hidden></div>
-                </div>
-                <div class="capability-item" data-capability="memory">
-                  <button class="capability" type="button" aria-expanded="false">
-                    <span class="capability-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg></span>
-                    <span class="capability-copy"><strong>Memory</strong><small id="memory-mode-value">Checking…</small></span>
-                    <span id="memory-status" class="status-orb"></span>
-                    <svg class="capability-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
-                  </button>
-                  <div class="capability-detail" hidden></div>
-                </div>
-                <div class="capability-item" data-capability="traces">
-                  <button class="capability" type="button" aria-expanded="false">
-                    <span class="capability-icon"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></span>
-                    <span class="capability-copy"><strong>Traces</strong><small id="tracing-mode-value">Checking…</small></span>
-                    <span id="tracing-status" class="status-orb"></span>
-                    <svg class="capability-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>
-                  </button>
-                  <div class="capability-detail" hidden></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="card-block memory-pane" id="memory-pane" hidden>
-              <div class="panel-subhead">
-                <button id="memory-back" class="icon-button" type="button" aria-label="Back to capabilities">
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-                <h2>Memory</h2>
-                <div class="subhead-actions">
-                  <button id="memory-refresh" class="icon-button" type="button" aria-label="Refresh memory entries">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-                  </button>
-                </div>
-              </div>
-              <div class="memory-store">
-                <span class="memory-store-icon" aria-hidden="true">
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5a3 3 0 0 0-3 3 3 3 0 0 0-1 5.8V17a2 2 0 0 0 4 0"/><path d="M12 5a3 3 0 0 1 3 3 3 3 0 0 1 1 5.8V17a2 2 0 0 1-4 0"/></svg>
-                </span>
-                <div class="memory-store-copy">
-                  <strong id="memory-store-name">Memory store</strong>
-                  <span id="memory-store-resource"></span>
-                </div>
-              </div>
-              <label class="memory-field-label" for="memory-actor-input">Actor ID</label>
-              <p class="memory-field-hint">Memories are scoped to an actor. Change this to browse another actor's entries.</p>
-              <input id="memory-actor-input" class="memory-actor" type="text" placeholder="Actor ID" autocomplete="off" spellcheck="false" />
-              <div class="memory-search">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-                <label class="sr-only" for="memory-search-input">Search entries</label>
-                <input id="memory-search-input" type="search" placeholder="Search entries" autocomplete="off" />
-              </div>
-              <div id="memory-count" class="memory-count"></div>
-              <div id="memory-entries" class="memory-entries" aria-live="polite">
-                <div class="state-empty">Loading memory…</div>
-              </div>
-            </div>
-
-            <div class="card-block sessions-block">
-              <div class="panel-subhead">
-                <h2>Sessions</h2>
-                <div class="subhead-actions">
-                  <button id="refresh-session" class="icon-button" type="button" aria-label="Refresh sessions">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
-                  </button>
-                  <button id="new-session" class="text-button" type="button">
-                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                    New session
-                  </button>
-                </div>
-              </div>
-              <div class="session-search">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-                <label class="sr-only" for="session-search-input">Search sessions</label>
-                <input id="session-search-input" type="search" placeholder="Search sessions" autocomplete="off" />
-              </div>
-              <div id="session-list" class="session-list" aria-live="polite">
-                <div class="state-empty">Loading sessions…</div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Kept for the runtime JS contract; surfaced through the chat + session list. -->
-          <div class="offscreen" aria-hidden="true">
-            <button id="copy-session" type="button"><code id="session-id">Loading…</code><span>Copy</span></button>
-            <button id="resume-session" type="button">Approve paused HITL</button>
-            <button id="reject-session" type="button">Reject paused HITL</button>
-            <p id="session-store-label"></p>
-            <div id="session-items"></div>
-          </div>
-        </aside>
-
-        <section class="chat-panel" aria-label="Agent chat">
-          <div class="chat-header">
-            <h2>Chat</h2>
-            <span id="run-status" class="run-status">Ready</span>
-          </div>
-
-          <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-busy="false">
-            <div id="empty-state" class="empty-state">
-              <div class="empty-mark" aria-hidden="true">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><ellipse cx="12" cy="12" rx="10" ry="4.3"/><ellipse cx="12" cy="12" rx="10" ry="4.3" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.3" transform="rotate(120 12 12)"/></svg>
-              </div>
-              <h2>Start a conversation</h2>
-              <p>Chat with your project agent from agent/agent.py. Every mode runs its instructions and tools; the model picker changes only the model for this page.</p>
-              <p class="empty-prompts-label">What would you like to test?</p>
-              <div class="prompt-grid">
-                <button type="button" data-prompt="Use the get_current_time tool and explain what you did.">Use a tool</button>
-                <button type="button" data-prompt="Remember in this conversation that my launch color is indigo. Do not use long-term memory.">Test session</button>
-                <button type="button" data-prompt="Send a message to demo@databricks.com saying the Agent Bricks demo is ready. Use the send_message tool.">Trigger approval</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="approval-panel" class="approval-panel" hidden>
-            <div>
-              <p class="eyebrow">Human approval required</p>
-              <p id="approval-summary">A tool is waiting for a decision.</p>
-            </div>
-            <div class="approval-actions">
-              <button id="reject-action" class="text-button" type="button">Reject</button>
-              <button id="approve-action" class="text-button" type="button">Approve</button>
-            </div>
-          </div>
-
-          <form id="composer" class="composer">
-            <label class="sr-only" for="prompt-input">Message the agent</label>
-            <textarea id="prompt-input" rows="1" placeholder="Ask your agent anything…"></textarea>
-            <div class="composer-footer">
-              <div class="mode-switcher" aria-label="Invocation mode">
-                <button class="mode-button active" data-mode="streaming" type="button" title="Show the answer as it is generated">Streaming</button>
-                <button class="mode-button" data-mode="background" type="button" title="Submit a run and wait for its result">Background</button>
-                <button class="mode-button" data-mode="sync" type="button" title="Return the complete response when finished">Foreground</button>
-              </div>
-              <div class="composer-right">
-                <span class="composer-model">
-                  <label class="sr-only" for="model-select">Agent model</label>
-                  <select id="model-select" aria-label="Agent model" title="Changes the model for this page; agent instructions and tools still run. Reload to reset." disabled>
-                    <option>Loading models…</option>
-                  </select>
-                  <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                </span>
-                <button id="send-button" class="send-button" type="submit" disabled>
-                  <span class="sr-only">Send message</span>
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-                </button>
-              </div>
-            </div>
-          </form>
-        </section>
-
-        <aside class="right-rail" aria-label="Runtime evidence">
-          <section class="control-card event-card">
-            <div class="panel-head">
-              <h2>Events</h2>
-              <div class="event-actions">
-                <button id="clear-events" class="icon-button" type="button" aria-label="Clear events">
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21 3.7 17.7a2.4 2.4 0 0 1 0-3.4l9-9a2.4 2.4 0 0 1 3.4 0l3.6 3.6a2.4 2.4 0 0 1 0 3.4L13 20"/><path d="M22 21H10"/><path d="m5 15 5 5"/></svg>
-                </button>
-                <button id="event-view-logs" class="icon-button active" type="button" aria-label="Logs view" aria-pressed="true">
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m10 13-2 2 2 2"/><path d="m14 13 2 2-2 2"/></svg>
-                </button>
-                <button id="event-view-list" class="icon-button" type="button" aria-label="List view" aria-pressed="false">
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>
-                </button>
-              </div>
-            </div>
-            <div id="event-filters" class="event-filters" role="tablist" hidden>
-              <button class="event-filter active" type="button" data-filter="all">All</button>
-              <button class="event-filter" type="button" data-filter="invocation">Invocation</button>
-              <button class="event-filter" type="button" data-filter="sessions">Sessions</button>
-              <button class="event-filter" type="button" data-filter="memory">Memory</button>
-              <button class="event-filter" type="button" data-filter="system">System</button>
-              <button class="event-filter" type="button" data-filter="error">Error</button>
-            </div>
-            <div id="event-log" class="event-log logs-view" role="log">
-              <div class="event-empty">
-                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-                <strong>No events in this session</strong>
-                <span>Start an agent run to collect runtime evidence.</span>
-              </div>
-            </div>
-            <div id="event-detail" class="event-detail" hidden>
-              <div class="event-detail-head">
-                <span>Event payload</span>
-                <button id="copy-event-detail" class="icon-button" type="button" aria-label="Copy payload">
-                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                </button>
-              </div>
-              <pre id="event-detail-json"></pre>
-            </div>
-          </section>
-        </aside>
-      </main>
+<div class="wrap">
+  <main class="card">
+    <div class="modes">
+      <button class="mode supervisor active" data-mode="supervisor">
+        <b>Supervisor</b><span>Knows our SAP purchasing data. Answers come from our systems.</span>
+      </button>
+      <button class="mode normal" data-mode="normal">
+        <b>Normal AI chat</b><span>Like ChatGPT. Same AI model, but no access to our data.</span>
+      </button>
     </div>
-
-    <div id="memory-modal" class="modal-backdrop" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="memory-modal-title">
-        <div class="modal-head">
-          <strong id="memory-modal-title" class="modal-title"></strong>
-          <button id="memory-modal-close" class="icon-button" type="button" aria-label="Close">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="modal-body"><pre id="memory-modal-body"></pre></div>
-        <div id="memory-modal-foot" class="modal-foot"></div>
-      </div>
+    <div class="chips" id="chips"></div>
+    <div id="log"></div>
+    <div class="composer">
+      <input id="q" placeholder="For example: Which suppliers have the worst on-time delivery?" autocomplete="off" />
+      <button id="send">Ask</button>
     </div>
+    <p class="small"><span id="hint"></span> <button class="link" id="reset">Start a new conversation</button></p>
+  </main>
 
-    <script src="/ui-assets/markdown-it-15.0.2.min.js" defer></script>
-    <script src="/ui-assets/app.js?v=5" defer></script>
-  </body>
+  <aside class="card">
+    <h2>How this assistant works</h2>
+    <h3>Supervisor mode</h3>
+    <p>Built for SAP purchasing. It answers from our own data, not from the internet.</p>
+    <ol>
+      <li>You ask a question in plain language.</li>
+      <li>The <b>supervisor</b> works out what you need. It passes the question to the right expert.</li>
+      <li>There are two experts, called <b>Genie Agents</b>. Each knows one area:
+        <br/><b>Sourcing &amp; Supplier Risk:</b> single sourcing, supplier risk, purchasing blocks, quotas, open mitigation cases.
+        <br/><b>Purchase Order Analytics:</b> on-time delivery, prices, spend, orders placed with risky suppliers.</li>
+      <li>The expert looks up the answer in our SAP data. It uses agreed business definitions, for example what "on time" means.</li>
+      <li>The supervisor puts the answer together and names its source.</li>
+    </ol>
+    <p>If a question touches both areas, it asks both experts, one after the other.</p>
+    <div class="flow">Your question → Supervisor → Genie Agent(s) → governed SAP data → Answer</div>
+    <h3>How it was built</h3>
+    <p>The data team built the supervisor as code with the Databricks <b>Agent Bricks CLI</b>. It runs on Databricks.
+      It only sees data it is allowed to see in Unity Catalog. Every question and answer is saved as a trace.</p>
+    <h3 class="n">Normal mode</h3>
+    <p>The same AI model, used like ChatGPT. It has <b>no access to our data</b> and knows none of our definitions.
+      Use it for general questions, explanations or drafting an e-mail. It cannot know our suppliers or orders.</p>
+    <p class="small">Tip: ask the same question in both modes and compare the answers.</p>
+  </aside>
+</div>
+
+<script>
+const md = window.markdownit({ html: false, linkify: true });
+const SAMPLES = {
+  supervisor: ["Which suppliers have the worst on-time delivery?",
+               "Which materials are single-sourced from a supplier with delivery risk?",
+               "Did we place purchase orders with suppliers that are the only source of a material and carry delivery risk?"],
+  normal: ["What does single sourcing mean in purchasing?",
+           "Which suppliers have the worst on-time delivery?",
+           "Draft a short e-mail asking a supplier for a second-source plan."],
+};
+const HINT = { supervisor: "Supervisor answers take about a minute, because it asks the experts first.",
+               normal: "Normal answers take a few seconds." };
+let mode = "supervisor";
+let sessions = { supervisor: crypto.randomUUID(), normal: crypto.randomUUID() };
+const log = document.getElementById("log"), q = document.getElementById("q"), send = document.getElementById("send");
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll(".mode").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
+  const chips = document.getElementById("chips"); chips.innerHTML = "";
+  SAMPLES[m].forEach(t => { const c = document.createElement("button"); c.className = "chip"; c.textContent = t;
+    c.onclick = () => { q.value = t; ask(); }; chips.appendChild(c); });
+  document.getElementById("hint").textContent = HINT[m];
+}
+document.querySelectorAll(".mode").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+document.getElementById("reset").onclick = () => {
+  sessions = { supervisor: crypto.randomUUID(), normal: crypto.randomUUID() }; log.innerHTML = ""; };
+
+function bubble(cls, html) {
+  const d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html;
+  log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+}
+const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const label = m => m === "supervisor" ? "Supervisor" : "Normal AI chat";
+
+function answerOf(result) {
+  let out = result.output; if (out && !Array.isArray(out)) out = out.output;
+  const ai = (out || []).filter(m => m.type === "ai" && !(m.tool_calls || []).length);
+  const c = ai.length ? ai[ai.length - 1].content : "";
+  return Array.isArray(c) ? c.map(x => x.text || "").join("") : (c || "");
+}
+
+async function ask() {
+  const text = q.value.trim(); if (!text || send.disabled) return;
+  const m = mode; q.value = ""; send.disabled = true;
+  bubble("q", esc(text));
+  const wait = bubble("a " + m, `<div class="tag">${label(m)}</div><span class="small">Working on it… <span class="t">0</span> s</span>`);
+  const t0 = Date.now(), timer = setInterval(() => wait.querySelector(".t").textContent = Math.round((Date.now() - t0) / 1000), 1000);
+  try {
+    let r = await fetch("/api/invocations", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: crypto.randomUUID(), session_id: sessions[m], background: true,
+                             input: { messages: [{ role: "user", content: text }], mode: m } }) });
+    let res = await r.json();
+    if (!r.ok) throw new Error(res.detail || r.statusText);
+    const url = res.status_url || `/api/invocations/${res.id}`;
+    while (!["completed", "failed", "cancelled", "interrupted"].includes(res.status)) {
+      await new Promise(ok => setTimeout(ok, 2000));
+      res = await (await fetch(url)).json();
+    }
+    if (res.status !== "completed") throw new Error(res.error?.message || res.error || ("Run " + res.status));
+    wait.innerHTML = `<div class="tag">${label(m)}</div>` + md.render(answerOf(res) || "(no answer)");
+  } catch (e) {
+    wait.classList.add("err"); wait.innerHTML = `<div class="tag">${label(m)}</div>Something went wrong: ${esc(String(e.message || e))}`;
+  } finally { clearInterval(timer); send.disabled = false; log.scrollTop = log.scrollHeight; q.focus(); }
+}
+send.onclick = ask;
+q.addEventListener("keydown", e => { if (e.key === "Enter") ask(); });
+setMode("supervisor");
+</script>
+</body>
 </html>

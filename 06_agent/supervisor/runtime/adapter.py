@@ -97,9 +97,11 @@ async def _invoke_agent(
     run_kwargs = {"workspace_client_for": auth.client_for} if user_auth else {}
     model = payload.get("model")
     model = model if isinstance(model, str) else None
+    # "supervisor" (default) or "normal" (plain model, no tools); sent by the chat page.
+    mode = payload.get("mode") if payload.get("mode") in agent_module.MODES else "supervisor"
     outputs = []
     if agent_input is None:
-        graph = await agent_module.create_agent_graph(actor, model, **run_kwargs)
+        graph = await agent_module.create_agent_graph(actor, model, mode=mode, **run_kwargs)
         outputs = [
             {"type": "message", "message": message.model_dump()}
             for message in await checkpointed_messages(
@@ -113,6 +115,7 @@ async def _invoke_agent(
             session_id=session_id,
             actor=actor,
             model=model,
+            mode=mode,
             invocation_id=context.invocation_id,
             **run_kwargs,
         )

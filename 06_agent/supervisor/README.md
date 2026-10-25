@@ -30,8 +30,15 @@ agentbricks deploy sap-supervisor --source /tmp/supervisor
 
 ## Calling it
 
-In a browser: open the app URL. `runtime/ui.py` + `ui/` serve the Agent Bricks chat app
-(no build step). Memory and Sessions show as off, because no stores are bound.
+In a browser: open the app URL. `runtime/ui.py` + `ui/index.html` serve the **SAP Purchasing
+Assistant** page (no build step). It has two modes, sent as `input.mode`:
+
+* `supervisor` (default): the routing prompt plus both Genie Agent tools.
+* `normal`: the same model with no tools, no data and no instructions, like ChatGPT.
+
+The page explains both modes in plain language. Each question is one MLflow trace (one
+span named after the mode: input = question, output = answer, tags `mode` and
+`genie_agents`). LangChain autologging is off on purpose, to keep traces readable.
 
 From code: `POST <app url>/api/invocations` with a Databricks **OAuth** token (Apps reject PATs and
 notebook tokens):

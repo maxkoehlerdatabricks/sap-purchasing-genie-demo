@@ -3,12 +3,18 @@
 Replaces the legacy Agent Bricks Supervisor Agent (MAS). The routing rules that used to
 live in the MAS ``instructions`` are the system prompt below; the two domain Genie Agents
 are native Genie tools declared in ``agent.toml`` (added by 06a_deploy_supervisor).
+
+Two modes, chosen per request with ``mode`` in the invocation input:
+* ``supervisor`` (default): the routing prompt plus both Genie Agent tools.
+* ``normal``: the same model with no tools, no company data and no instructions, like a
+  general chat assistant. The chat page offers it for comparison.
 """
 
 import os
 from collections.abc import AsyncGenerator, Callable
 from typing import Any
 
+import mlflow
 from databricks.sdk import WorkspaceClient
 from databricks_langchain import ChatDatabricks
 from langchain.agents import create_agent
@@ -18,7 +24,6 @@ from agent.tools import all_tools
 from databricks_agentkit import workspace_client, workspace_headers
 from databricks_agentkit.langgraph import (
     checkpointer,
-    configure_tracing,
     genie_tools,
     start_trace,
     thread_config,
@@ -27,6 +32,7 @@ from databricks_agentkit.langgraph.session_store import (
     invocation_id_from_metadata,
     invocation_metadata,
 )
+from databricks_agentkit.runtime import configure_tracing
 from databricks_agentkit.runtime.tool_manifest import resolve_model_service
 
 # A Unity Catalog AI Gateway model service from `system.ai` (`agentbricks experimental models list`).
@@ -65,6 +71,10 @@ Rules:
    for example "Source: purchase_order_analytics".
 """
 
+MODES = ("supervisor", "normal")
+GENIE_AGENTS = {"sourcing_supplier_risk": "Sourcing & Supplier Risk",
+                "purchase_order_analytics": "Purchase Order Analytics"}
+
 
 class _RoutedChatDatabricks(ChatDatabricks):
     """Forward account-host workspace routing to the underlying OpenAI clients."""
@@ -77,7 +87,11 @@ class _RoutedChatDatabricks(ChatDatabricks):
 
 
 def configure() -> None:
-    """Wire up global state; call once at server startup (not at import)."""
+    """Wire up global state; call once at server startup (not at import).
+
+    Tracing is on, but without LangChain autologging: each trace is one span holding the
+    question and the answer (see ``run_agent``), so it stays readable for business users.
+    """
     workspace_client()  # fail fast if Databricks auth is not configured
     configure_tracing()
 
@@ -86,10 +100,12 @@ async def create_agent_graph(
     actor: str,
     model: str | None = None,
     *,
+    mode: str = "supervisor",
     workspace_client_for: Callable[[str], WorkspaceClient] | None = None,
 ):
-    """Build the supervisor graph: the two Genie Agent tool sets plus any local tools."""
-    tools = [*all_tools(), *genie_tools(workspace_client_for=workspace_client_for)]
+    """Build the graph: the supervisor (Genie Agent tools + routing prompt) or the plain model."""
+    supervisor = mode != "normal"
+    tools = [*all_tools(), *genie_tools(workspace_client_for=workspace_client_for)] if supervisor else []
     return create_agent(
         # use_ai_gateway routes to the Unity Catalog AI Gateway, so `model` is a
         # `system.ai.*` model service name rather than a serving-endpoint name.
@@ -97,7 +113,7 @@ async def create_agent_graph(
             endpoint=model or MODEL, workspace_client=workspace_client(), use_ai_gateway=True
         ),
         tools=tools,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=SYSTEM_PROMPT if supervisor else None,
         checkpointer=checkpointer(),
     )
 
@@ -123,6 +139,7 @@ async def run_agent(
     session_id: str,
     actor: str | None = None,
     model: str | None = None,
+    mode: str = "supervisor",
     invocation_id: str | None = None,
     workspace_client_for: Callable[[str], WorkspaceClient] | None = None,
     graph: Any = None,
@@ -130,17 +147,19 @@ async def run_agent(
     """Run the agent and yield native LangGraph stream events.
 
     Framework-native entrypoint with no dependency on Agent Bricks request types, so
-    07a_benchmark can call it in-process from a notebook.
+    07a_benchmark can call it in-process from a notebook. The trace is one span named after
+    the mode, with the question as input and the answer as output, tagged with the
+    Genie Agents that answered.
     """
     actor = actor or session_id
     if graph is None:
-        graph = await create_agent_graph(actor, model, workspace_client_for=workspace_client_for)
+        graph = await create_agent_graph(actor, model, mode=mode, workspace_client_for=workspace_client_for)
     config = thread_config(session_id, actor)
     if invocation_id:
         config["metadata"] = invocation_metadata(invocation_id)
 
-    last_update: Any = None
-    with start_trace(name="invoke", inputs=agent_input, session_id=session_id) as span:
+    answer, asked = "", []
+    with start_trace(name=mode, inputs={"question": _question(agent_input)}, session_id=session_id) as span:
         async for event in graph.astream(
             input=agent_input,
             config=config,
@@ -148,7 +167,30 @@ async def run_agent(
             durability="sync",
         ):
             if event[0] == "updates":
-                last_update = event[1]
+                for node in event[1].values():
+                    for message in (node.get("messages", []) if isinstance(node, dict) else []):
+                        for call in getattr(message, "tool_calls", None) or []:
+                            agent = next((n for k, n in GENIE_AGENTS.items() if call["name"].startswith(k)), None)
+                            if agent and agent not in asked:
+                                asked.append(agent)
+                        if message.type == "ai" and not getattr(message, "tool_calls", None):
+                            answer = _text(message.content) or answer
             yield event
-        if span is not None and last_update is not None:
-            span.set_outputs(last_update)
+        if span is not None:
+            span.set_outputs({"answer": answer})
+            mlflow.update_current_trace(tags={"mode": mode, "genie_agents": ", ".join(asked) or "none"})
+
+
+def _text(content: Any) -> str:
+    if isinstance(content, list):
+        return "".join(c.get("text", "") for c in content if isinstance(c, dict))
+    return content or ""
+
+
+def _question(agent_input: Any) -> str:
+    messages = (agent_input or {}).get("messages", []) if isinstance(agent_input, dict) else []
+    for m in reversed(messages):
+        role = m.get("role") if isinstance(m, dict) else getattr(m, "type", "")
+        if role in ("user", "human"):
+            return _text(m.get("content") if isinstance(m, dict) else m.content)
+    return ""
