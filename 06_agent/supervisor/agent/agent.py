@@ -66,8 +66,9 @@ Rules:
    conversation_id and message_id. Do not resubmit the question.
 4. When the question asks for a list or a count, call *_query_result with the query
    attachment's attachment_id and answer from those rows.
-5. Start directly with the answer. Do not describe your own steps ("Now I can match...").
-   Answer concisely. Show result rows as a markdown table (at most 20 rows, and say how
+5. Your final message is shown as-is to a business user. Its first sentence must be the
+   answer itself. Never describe your own steps or plans in it ("Now I'll identify...",
+   "Now I can match..."). Answer concisely. Show result rows as a markdown table (at most 20 rows, and say how
    many rows there are in total). Name the Genie Agent(s) you used on the last line,
    for example "Source: purchase_order_analytics".
 """
