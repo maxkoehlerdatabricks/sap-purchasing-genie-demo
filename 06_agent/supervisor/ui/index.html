@@ -3,166 +3,267 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SAP Purchasing Assistant</title>
+  <title>SAP Purchasing Assistant · Databricks</title>
   <script src="/ui/markdown-it-15.0.2.min.js"></script>
   <style>
-    :root { --db-red:#FF3621; --db-navy:#1B3139; --db-green:#00A972; --db-teal:#00808C; --line:#e3e6ea; }
+    /* Databricks brand colors */
+    :root {
+      --lava:#FF3621; --lava-dark:#E02E1A; --navy:#1B3139; --navy-2:#0B2026; --teal:#1B5162;
+      --green:#00A972; --slate:#618794; --oat:#F9F7F4; --oat-2:#EEEDE9; --line:#E2DFD9;
+      --shadow:0 1px 2px rgba(27,49,57,.06), 0 8px 24px rgba(27,49,57,.08);
+    }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:#f6f7f9; color:var(--db-navy); }
-    header { background:var(--db-navy); color:#fff; padding:14px 24px; }
-    header h1 { margin:0; font-size:20px; }
-    header p { margin:4px 0 0; font-size:13px; color:#c9d3d8; }
-    .wrap { max-width:1280px; margin:0 auto; padding:16px; display:grid; grid-template-columns:1fr 380px; gap:16px; }
-    .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:16px; }
-    .modes { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
-    .mode { text-align:left; border:2px solid var(--line); background:#fff; border-radius:10px; padding:10px 12px; cursor:pointer; color:inherit; font:inherit; }
-    .mode b { display:block; font-size:15px; }
-    .mode span { font-size:12px; color:#5b6b73; }
-    .mode.active.supervisor { border-color:var(--db-teal); background:#eef8f8; }
-    .mode.active.normal { border-color:#8a96a0; background:#f2f4f6; }
-    .chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-    .chip { border:1px solid var(--line); background:#fff; border-radius:16px; padding:4px 10px; font-size:12px; cursor:pointer; }
-    #log { display:flex; flex-direction:column; gap:10px; min-height:340px; max-height:60vh; overflow:auto; padding:4px; }
-    .msg { padding:10px 14px; border-radius:10px; max-width:90%; font-size:14px; line-height:1.45; }
-    .msg.q { align-self:flex-end; background:var(--db-navy); color:#fff; white-space:pre-wrap; }
-    .msg.a { align-self:flex-start; background:#fff; border:1px solid var(--line); }
-    .msg.a.normal { background:#f2f4f6; }
-    .msg .tag { font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-bottom:4px; }
-    .msg.a.supervisor .tag { color:var(--db-teal); }
-    .msg.a.normal .tag { color:#6b7780; }
-    .msg.err { border-color:var(--db-red); color:var(--db-red); }
-    .msg table { border-collapse:collapse; font-size:12px; margin:6px 0; }
-    .msg th, .msg td { border:1px solid var(--line); padding:3px 6px; text-align:left; }
+    body { margin:0; font-family:"DM Sans",-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; background:var(--oat); color:var(--navy); }
+    header { background:linear-gradient(120deg, var(--navy-2) 0%, var(--navy) 55%, var(--teal) 100%); color:#fff;
+             padding:20px 32px 22px; position:relative; overflow:hidden; }
+    header::after { content:""; position:absolute; left:0; right:0; bottom:0; height:4px;
+                    background:linear-gradient(90deg, var(--lava), #FF8A4C, var(--lava)); }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .logo { width:40px; height:40px; border-radius:10px; background:var(--lava); display:grid; place-items:center;
+            box-shadow:0 4px 14px rgba(255,54,33,.45); }
+    .logo svg { width:24px; height:24px; }
+    header h1 { margin:0; font-size:22px; letter-spacing:.2px; }
+    header p { margin:3px 0 0; font-size:13px; color:#C9D6DB; }
+    .pill { margin-left:auto; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+            border:1px solid rgba(255,255,255,.35); border-radius:999px; padding:5px 12px; color:#fff; }
+    .wrap { max-width:1320px; margin:0 auto; padding:20px; display:grid; grid-template-columns:1fr 390px; gap:20px; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:var(--shadow); }
+    .modes { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+    .mode { text-align:left; border:2px solid var(--line); background:#fff; border-radius:12px; padding:12px 14px;
+            cursor:pointer; color:inherit; font:inherit; transition:all .15s ease; position:relative; }
+    .mode:hover { transform:translateY(-1px); box-shadow:var(--shadow); }
+    .mode b { display:block; font-size:16px; margin-bottom:2px; }
+    .mode .ctx { display:inline-block; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+                 border-radius:999px; padding:2px 8px; margin-bottom:6px; }
+    .mode.supervisor .ctx { background:rgba(0,169,114,.12); color:var(--green); }
+    .mode.normal .ctx { background:var(--oat-2); color:var(--slate); }
+    .mode span.d { display:block; font-size:12.5px; color:#4A5D64; line-height:1.4; }
+    .mode.active.supervisor { border-color:var(--lava); background:linear-gradient(180deg,#FFF5F3,#fff); box-shadow:0 6px 20px rgba(255,54,33,.15); }
+    .mode.active.normal { border-color:var(--slate); background:linear-gradient(180deg,#F3F6F7,#fff); }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .chips .lbl { width:100%; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--slate); }
+    .chip { border:1px solid var(--line); background:var(--oat); border-radius:999px; padding:6px 12px; font-size:12.5px;
+            cursor:pointer; color:var(--navy); transition:all .15s; text-align:left; }
+    .chip:hover { border-color:var(--lava); color:var(--lava); background:#fff; }
+    #log { display:flex; flex-direction:column; gap:12px; min-height:340px; max-height:62vh; overflow:auto; padding:6px 2px; }
+    .empty { margin:auto; text-align:center; color:var(--slate); font-size:13px; }
+    .msg { padding:12px 16px; border-radius:14px; max-width:92%; font-size:14px; line-height:1.5; }
+    .msg.q { align-self:flex-end; background:var(--navy); color:#fff; white-space:pre-wrap; border-bottom-right-radius:4px; }
+    .msg.a { align-self:flex-start; background:#fff; border:1px solid var(--line); border-bottom-left-radius:4px; box-shadow:var(--shadow); }
+    .msg.a.supervisor { border-left:4px solid var(--lava); }
+    .msg.a.normal { border-left:4px solid var(--slate); background:#FBFBFA; }
+    .tag { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
+    .msg.a.supervisor .tag { color:var(--lava); }
+    .msg.a.normal .tag { color:var(--slate); }
+    .msg.err { color:var(--lava-dark); }
+    .msg table { border-collapse:collapse; font-size:12px; margin:8px 0; }
+    .msg th { background:var(--oat-2); }
+    .msg th, .msg td { border:1px solid var(--line); padding:4px 8px; text-align:left; }
     .msg p { margin:4px 0; }
-    .composer { display:flex; gap:8px; margin-top:12px; }
-    .composer input { flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-size:14px; }
-    .composer button { background:var(--db-red); color:#fff; border:none; border-radius:8px; padding:10px 18px; cursor:pointer; font-size:14px; }
-    .composer button:disabled { opacity:.5; cursor:default; }
-    .small { font-size:12px; color:#5b6b73; }
-    .link { background:none; border:none; color:var(--db-teal); cursor:pointer; padding:0; font-size:12px; text-decoration:underline; }
-    aside h2 { font-size:15px; margin:0 0 6px; }
-    aside h3 { font-size:13px; margin:14px 0 4px; color:var(--db-teal); }
-    aside h3.n { color:#6b7780; }
-    aside p, aside li { font-size:13px; line-height:1.45; }
+    .trace { margin-top:10px; background:var(--oat); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:12.5px; }
+    .trace .h { font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--teal); margin-bottom:6px; }
+    .trace ol { margin:0; padding-left:20px; }
+    .trace li { margin:3px 0; }
+    .trace q { font-style:italic; color:#33474E; }
+    .dots span { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lava); margin-right:4px; animation:b 1.2s infinite ease-in-out; }
+    .dots span:nth-child(2) { animation-delay:.15s; } .dots span:nth-child(3) { animation-delay:.3s; }
+    @keyframes b { 0%,80%,100% { opacity:.25; transform:scale(.8);} 40% { opacity:1; transform:scale(1);} }
+    .composer { display:flex; gap:10px; margin-top:14px; }
+    .composer input { flex:1; padding:12px 14px; border:1px solid var(--line); border-radius:10px; font-size:14px; background:var(--oat); }
+    .composer input:focus { outline:none; border-color:var(--lava); background:#fff; box-shadow:0 0 0 3px rgba(255,54,33,.12); }
+    .composer button { background:linear-gradient(180deg,var(--lava),var(--lava-dark)); color:#fff; border:none; border-radius:10px;
+                       padding:12px 22px; cursor:pointer; font-size:14px; font-weight:700; box-shadow:0 4px 12px rgba(255,54,33,.3); }
+    .composer button:disabled { opacity:.5; cursor:default; box-shadow:none; }
+    .small { font-size:12px; color:var(--slate); }
+    .link { background:none; border:none; color:var(--lava); cursor:pointer; padding:0; font-size:12px; font-weight:600; }
+    aside h2 { font-size:16px; margin:0 0 10px; }
+    aside h3 { font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin:16px 0 6px; color:var(--lava); }
+    aside h3.n { color:var(--slate); }
+    aside p, aside li { font-size:13px; line-height:1.5; color:#33474E; }
     aside ol { padding-left:18px; margin:4px 0; }
-    aside li { margin-bottom:4px; }
-    .flow { font-size:12px; background:#f6f7f9; border-radius:8px; padding:8px 10px; line-height:1.6; }
-    @media (max-width:900px) { .wrap { grid-template-columns:1fr; } }
+    aside li { margin-bottom:5px; }
+    .flow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:11.5px; margin:10px 0 4px; }
+    .flow b { background:var(--navy); color:#fff; border-radius:6px; padding:4px 8px; font-weight:600; }
+    .flow b.g { background:var(--green); } .flow b.l { background:var(--lava); }
+    .flow i { color:var(--slate); font-style:normal; }
+    .model { display:inline-block; font-family:ui-monospace,Menlo,monospace; font-size:11.5px; background:var(--oat-2); border-radius:6px; padding:1px 6px; }
+    .compare { width:100%; border-collapse:collapse; font-size:12px; margin-top:6px; }
+    .compare th, .compare td { border-bottom:1px solid var(--line); padding:5px 4px; text-align:left; vertical-align:top; }
+    .compare th { color:var(--slate); font-weight:700; }
+    .yes { color:var(--green); font-weight:700; } .no { color:var(--slate); }
+    @media (max-width:960px) { .wrap { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
 <header>
-  <h1>SAP Purchasing Assistant</h1>
-  <p>Ask a purchasing question in plain language. Choose how it should be answered.</p>
+  <div class="brand">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round">
+      <path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 16 9 5 9-5"/></svg></div>
+    <div>
+      <h1>SAP Purchasing Assistant</h1>
+      <p>Ask a purchasing question in plain language. Compare an AI with our context to an AI without it.</p>
+    </div>
+    <div class="pill">Built on Databricks</div>
+  </div>
 </header>
 
 <div class="wrap">
   <main class="card">
     <div class="modes">
       <button class="mode supervisor active" data-mode="supervisor">
-        <b>Supervisor</b><span>Knows our SAP purchasing data. Answers come from our systems.</span>
+        <span class="ctx">With our context</span>
+        <b>Supervisor</b>
+        <span class="d">The AI model <b style="display:inline;font-size:inherit">with</b> our context. It knows our SAP
+          purchasing data and asks our two Genie Agents before it answers.</span>
       </button>
       <button class="mode normal" data-mode="normal">
-        <b>Normal AI chat</b><span>Like ChatGPT. Same AI model, but no access to our data.</span>
+        <span class="ctx">No context</span>
+        <b>Normal ChatGPT-style chat</b>
+        <span class="d">The same AI model <b style="display:inline;font-size:inherit">without</b> our context. Model:
+          <span class="model" data-model>…</span>. No access to our data.</span>
       </button>
     </div>
-    <div class="chips" id="chips"></div>
-    <div id="log"></div>
+    <div class="chips" id="chips"><div class="lbl">Example questions (each one needs both Genie Agents)</div></div>
+    <div id="log"><div class="empty">Pick an example or type a question. Then try the same question in the other mode.</div></div>
     <div class="composer">
-      <input id="q" placeholder="For example: Which suppliers have the worst on-time delivery?" autocomplete="off" />
+      <input id="q" placeholder="Ask a purchasing question…" autocomplete="off" />
       <button id="send">Ask</button>
     </div>
-    <p class="small"><span id="hint"></span> <button class="link" id="reset">Start a new conversation</button></p>
+    <p class="small"><span id="hint"></span> · <button class="link" id="reset">Start a new conversation</button></p>
   </main>
 
   <aside class="card">
     <h2>How this assistant works</h2>
-    <h3>Supervisor mode</h3>
+    <table class="compare">
+      <tr><th></th><th>Supervisor</th><th>Normal chat</th></tr>
+      <tr><td>AI model</td><td><span class="model" data-model>…</span></td><td><span class="model" data-model>…</span></td></tr>
+      <tr><td>Knows our SAP data</td><td class="yes">Yes</td><td class="no">No</td></tr>
+      <tr><td>Uses our business definitions</td><td class="yes">Yes</td><td class="no">No</td></tr>
+      <tr><td>Asks Genie Agents</td><td class="yes">Yes, two</td><td class="no">No</td></tr>
+      <tr><td>Names its source</td><td class="yes">Yes</td><td class="no">No</td></tr>
+    </table>
+
+    <h3>Supervisor: the model with our context</h3>
     <p>Built for SAP purchasing. It answers from our own data, not from the internet.</p>
     <ol>
       <li>You ask a question in plain language.</li>
-      <li>The <b>supervisor</b> works out what you need. It passes the question to the right expert.</li>
-      <li>There are two experts, called <b>Genie Agents</b>. Each knows one area:
+      <li>The <b>supervisor</b> splits it into smaller questions for the right experts.</li>
+      <li>Two experts, called <b>Genie Agents</b>, each know one area:
         <br/><b>Sourcing &amp; Supplier Risk:</b> single sourcing, supplier risk, purchasing blocks, quotas, open mitigation cases.
-        <br/><b>Purchase Order Analytics:</b> on-time delivery, prices, spend, orders placed with risky suppliers.</li>
-      <li>The expert looks up the answer in our SAP data. It uses agreed business definitions, for example what "on time" means.</li>
-      <li>The supervisor puts the answer together and names its source.</li>
+        <br/><b>Purchase Order Analytics:</b> on-time delivery, prices, spend, orders with risky suppliers.</li>
+      <li>Each expert looks up the answer in our SAP data, using agreed business definitions, for example what "on time" means.</li>
+      <li>The supervisor combines the answers and names its sources.</li>
     </ol>
-    <p>If a question touches both areas, it asks both experts, one after the other.</p>
-    <div class="flow">Your question → Supervisor → Genie Agent(s) → governed SAP data → Answer</div>
+    <div class="flow"><b>Your question</b><i>→</i><b class="l">Supervisor</b><i>→</i><b class="g">Genie Agents</b><i>→</i><b>SAP data</b><i>→</i><b>Answer</b></div>
+    <p class="small">Under each answer you see the trace: which Genie Agent got which question.</p>
+
     <h3>How it was built</h3>
     <p>The data team built the supervisor as code with the Databricks <b>Agent Bricks CLI</b>. It runs on Databricks.
-      It only sees data it is allowed to see in Unity Catalog. Every question and answer is saved as a trace.</p>
-    <h3 class="n">Normal mode</h3>
-    <p>The same AI model, used like ChatGPT. It has <b>no access to our data</b> and knows none of our definitions.
-      Use it for general questions, explanations or drafting an e-mail. It cannot know our suppliers or orders.</p>
-    <p class="small">Tip: ask the same question in both modes and compare the answers.</p>
+      It only sees data it is allowed to see in Unity Catalog. Every question and answer is also saved as a trace in MLflow.</p>
+
+    <h3 class="n">Normal chat: the model without our context</h3>
+    <p>The same AI model, <span class="model" data-model>…</span>, used like ChatGPT. It gets no instructions,
+      no tools and no access to our data. It can explain general ideas or draft an e-mail, but it cannot know our
+      suppliers or orders.</p>
   </aside>
 </div>
 
 <script>
 const md = window.markdownit({ html: false, linkify: true });
-const SAMPLES = {
-  supervisor: ["Which suppliers have the worst on-time delivery?",
-               "Which materials are single-sourced from a supplier with delivery risk?",
-               "Did we place purchase orders with suppliers that are the only source of a material and carry delivery risk?"],
-  normal: ["What does single sourcing mean in purchasing?",
-           "Which suppliers have the worst on-time delivery?",
-           "Draft a short e-mail asking a supplier for a second-source plan."],
-};
-const HINT = { supervisor: "Supervisor answers take about a minute, because it asks the experts first.",
+// Each example needs both Genie Agents: the supervisor splits it into one question per expert.
+const SAMPLES = [
+  "Did we place purchase orders with suppliers that are the only source of a material and carry delivery risk?",
+  "What is the on-time delivery rate of the suppliers that are flagged with delivery risk?",
+  "How much have we spent with suppliers that hold a purchasing block?",
+  "Which single-sourced materials come from suppliers with an on-time delivery rate below 60%?",
+];
+const AGENTS = { sourcing_supplier_risk: "Sourcing & Supplier Risk", purchase_order_analytics: "Purchase Order Analytics" };
+const HINT = { supervisor: "Supervisor answers take about a minute, because it asks the Genie Agents first.",
                normal: "Normal answers take a few seconds." };
-let mode = "supervisor";
+let mode = "supervisor", MODEL = "", MODEL_NAME = "the AI model";
 let sessions = { supervisor: crypto.randomUUID(), normal: crypto.randomUUID() };
 const log = document.getElementById("log"), q = document.getElementById("q"), send = document.getElementById("send");
+
+// "system.ai.claude-sonnet-4-5" -> "Claude Sonnet 4.5"
+function prettyModel(m) {
+  const parts = m.replace(/^system\.ai\./, "").split("-");
+  const words = [], nums = [];
+  parts.forEach(p => /^\d+$/.test(p) ? nums.push(p) : words.push(p.charAt(0).toUpperCase() + p.slice(1)));
+  return (words.join(" ") + (nums.length ? " " + nums.join(".") : "")).trim();
+}
+fetch("/api/ui/info").then(r => r.json()).then(i => {
+  MODEL = i.model; MODEL_NAME = prettyModel(i.model);
+  document.querySelectorAll("[data-model]").forEach(e => { e.textContent = MODEL_NAME; e.title = MODEL; });
+}).catch(() => {});
 
 function setMode(m) {
   mode = m;
   document.querySelectorAll(".mode").forEach(b => b.classList.toggle("active", b.dataset.mode === m));
-  const chips = document.getElementById("chips"); chips.innerHTML = "";
-  SAMPLES[m].forEach(t => { const c = document.createElement("button"); c.className = "chip"; c.textContent = t;
-    c.onclick = () => { q.value = t; ask(); }; chips.appendChild(c); });
   document.getElementById("hint").textContent = HINT[m];
 }
+const chips = document.getElementById("chips");
+SAMPLES.forEach(t => { const c = document.createElement("button"); c.className = "chip"; c.textContent = t;
+  c.onclick = () => { q.value = t; ask(); }; chips.appendChild(c); });
 document.querySelectorAll(".mode").forEach(b => b.onclick = () => setMode(b.dataset.mode));
 document.getElementById("reset").onclick = () => {
-  sessions = { supervisor: crypto.randomUUID(), normal: crypto.randomUUID() }; log.innerHTML = ""; };
+  sessions = { supervisor: crypto.randomUUID(), normal: crypto.randomUUID() };
+  log.innerHTML = '<div class="empty">New conversation.</div>'; };
 
 function bubble(cls, html) {
+  log.querySelector(".empty")?.remove();
   const d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html;
   log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
 }
-const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-const label = m => m === "supervisor" ? "Supervisor" : "Normal AI chat";
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const label = m => m === "supervisor" ? "Supervisor · with our context" : "Normal chat · no context";
 
-function answerOf(result) {
-  let out = result.output; if (out && !Array.isArray(out)) out = out.output;
-  const ai = (out || []).filter(m => m.type === "ai" && !(m.tool_calls || []).length);
+function messagesOf(result) {
+  let out = result.output; if (out && !Array.isArray(out)) out = out.output; return out || [];
+}
+function answerOf(msgs) {
+  const ai = msgs.filter(m => m.type === "ai" && !(m.tool_calls || []).length);
   const c = ai.length ? ai[ai.length - 1].content : "";
   return Array.isArray(c) ? c.map(x => x.text || "").join("") : (c || "");
+}
+// The readable trace: one line per question passed to a Genie Agent.
+function traceOf(m, msgs) {
+  const steps = [];
+  msgs.filter(x => x.type === "ai").forEach(x => (x.tool_calls || []).forEach(c => {
+    const key = Object.keys(AGENTS).find(k => c.name === k + "_ask");
+    if (key) steps.push(`Asked Genie Agent <b>${AGENTS[key]}</b>: <q>${esc(c.args?.question || "")}</q>`);
+  }));
+  if (m === "normal") {
+    steps.push(`No Genie Agent asked. <b>${esc(MODEL_NAME)}</b> answered from general knowledge only, without our data.`);
+  } else {
+    if (!steps.length) steps.push("No Genie Agent was needed for this question.");
+    steps.push(`<b>${esc(MODEL_NAME)}</b> combined the answers.`);
+  }
+  return `<div class="trace"><div class="h">Trace</div><ol>${steps.map(s => `<li>${s}</li>`).join("")}</ol></div>`;
 }
 
 async function ask() {
   const text = q.value.trim(); if (!text || send.disabled) return;
   const m = mode; q.value = ""; send.disabled = true;
   bubble("q", esc(text));
-  const wait = bubble("a " + m, `<div class="tag">${label(m)}</div><span class="small">Working on it… <span class="t">0</span> s</span>`);
+  const wait = bubble("a " + m, `<div class="tag">${label(m)}</div><span class="dots"><span></span><span></span><span></span></span>
+    <span class="small">${m === "supervisor" ? "Asking the Genie Agents" : "Thinking"}… <span class="t">0</span> s</span>`);
   const t0 = Date.now(), timer = setInterval(() => wait.querySelector(".t").textContent = Math.round((Date.now() - t0) / 1000), 1000);
   try {
     let r = await fetch("/api/invocations", { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: crypto.randomUUID(), session_id: sessions[m], background: true,
                              input: { messages: [{ role: "user", content: text }], mode: m } }) });
     let res = await r.json();
-    if (!r.ok) throw new Error(res.detail || r.statusText);
+    if (!r.ok) throw new Error(res.detail || res.error?.message || r.statusText);
     const url = res.status_url || `/api/invocations/${res.id}`;
-    while (!["completed", "failed", "cancelled", "interrupted"].includes(res.status)) {
+    while (!["completed", "failed", "cancelled"].includes(res.status)) {
       await new Promise(ok => setTimeout(ok, 2000));
       res = await (await fetch(url)).json();
     }
     if (res.status !== "completed") throw new Error(res.error?.message || res.error || ("Run " + res.status));
-    wait.innerHTML = `<div class="tag">${label(m)}</div>` + md.render(answerOf(res) || "(no answer)");
+    const msgs = messagesOf(res);
+    wait.innerHTML = `<div class="tag">${label(m)}</div>` + md.render(answerOf(msgs) || "(no answer)") + traceOf(m, msgs);
   } catch (e) {
-    wait.classList.add("err"); wait.innerHTML = `<div class="tag">${label(m)}</div>Something went wrong: ${esc(String(e.message || e))}`;
+    wait.classList.add("err"); wait.innerHTML = `<div class="tag">${label(m)}</div>Something went wrong: ${esc(e.message || e)}`;
   } finally { clearInterval(timer); send.disabled = false; log.scrollTop = log.scrollHeight; q.focus(); }
 }
 send.onclick = ask;

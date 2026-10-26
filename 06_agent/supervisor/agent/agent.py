@@ -66,7 +66,8 @@ Rules:
    conversation_id and message_id. Do not resubmit the question.
 4. When the question asks for a list or a count, call *_query_result with the query
    attachment's attachment_id and answer from those rows.
-5. Answer concisely. Show result rows as a markdown table (at most 20 rows, and say how
+5. Start directly with the answer. Do not describe your own steps ("Now I can match...").
+   Answer concisely. Show result rows as a markdown table (at most 20 rows, and say how
    many rows there are in total). Name the Genie Agent(s) you used on the last line,
    for example "Source: purchase_order_analytics".
 """
@@ -89,8 +90,9 @@ class _RoutedChatDatabricks(ChatDatabricks):
 def configure() -> None:
     """Wire up global state; call once at server startup (not at import).
 
-    Tracing is on, but without LangChain autologging: each trace is one span holding the
-    question and the answer (see ``run_agent``), so it stays readable for business users.
+    Tracing is on, but without LangChain autologging, so traces stay readable for business
+    users: a root span with the question and the answer (see ``run_agent``), and one child
+    span per question passed to a Genie Agent (see ``_traced_ask``).
     """
     workspace_client()  # fail fast if Databricks auth is not configured
     configure_tracing()
@@ -105,7 +107,7 @@ async def create_agent_graph(
 ):
     """Build the graph: the supervisor (Genie Agent tools + routing prompt) or the plain model."""
     supervisor = mode != "normal"
-    tools = [*all_tools(), *genie_tools(workspace_client_for=workspace_client_for)] if supervisor else []
+    tools = [*all_tools(), *map(_traced_ask, genie_tools(workspace_client_for=workspace_client_for))] if supervisor else []
     return create_agent(
         # use_ai_gateway routes to the Unity Catalog AI Gateway, so `model` is a
         # `system.ai.*` model service name rather than a serving-endpoint name.
@@ -179,6 +181,30 @@ async def run_agent(
         if span is not None:
             span.set_outputs({"answer": answer})
             mlflow.update_current_trace(tags={"mode": mode, "genie_agents": ", ".join(asked) or "none"})
+
+
+def _traced_ask(tool: Any) -> Any:
+    """Record each Genie question as one readable span: "Ask Genie Agent: <name>".
+
+    Only the ``*_ask`` tools are wrapped (poll and query_result stay untraced), so a trace
+    reads as the question, the questions passed to each Genie Agent, and the answer.
+    """
+    agent = next((n for k, n in GENIE_AGENTS.items() if tool.name == f"{k}_ask"), None)
+    if agent is None:
+        return tool
+    ask = tool.coroutine
+
+    async def traced(question: str, conversation_id: str | None = None) -> dict[str, Any]:
+        with mlflow.start_span(name=f"Ask Genie Agent: {agent}") as span:
+            span.set_inputs({"question": question})
+            result = await ask(question, conversation_id)
+            rows = next((a["query"].get("query_result_metadata", {}).get("row_count")
+                         for a in result.get("attachments") or [] if a.get("query")), None)
+            span.set_outputs({"status": result.get("status"), "rows": rows})
+            return result
+
+    tool.coroutine = traced
+    return tool
 
 
 def _text(content: Any) -> str:

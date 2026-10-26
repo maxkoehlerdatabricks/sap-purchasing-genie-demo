@@ -36,9 +36,12 @@ Assistant** page (no build step). It has two modes, sent as `input.mode`:
 * `supervisor` (default): the routing prompt plus both Genie Agent tools.
 * `normal`: the same model with no tools, no data and no instructions, like ChatGPT.
 
-The page explains both modes in plain language. Each question is one MLflow trace (one
-span named after the mode: input = question, output = answer, tags `mode` and
-`genie_agents`). LangChain autologging is off on purpose, to keep traces readable.
+The page explains both modes in plain language, names the model and shows a short trace
+under every answer ("Asked Genie Agent <name>: <question>"). The example questions all
+need both Genie Agents. In MLflow each question is one trace: a root span named after the
+mode (input = question, output = answer, tags `mode` and `genie_agents`) with one child span
+"Ask Genie Agent: <name>" per question passed on. LangChain autologging is off on purpose,
+to keep traces readable.
 
 From code: `POST <app url>/api/invocations` with a Databricks **OAuth** token (Apps reject PATs and
 notebook tokens):
