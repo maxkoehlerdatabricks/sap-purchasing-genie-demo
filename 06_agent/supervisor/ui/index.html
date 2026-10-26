@@ -29,11 +29,12 @@
     .page { max-width:1800px; margin:0 auto; padding:20px 24px 32px; }
     .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:var(--shadow); }
     .ask { margin-bottom:20px; }
-    .composer { display:flex; gap:10px; }
-    .composer input { flex:1; padding:14px 16px; border:1px solid var(--line); border-radius:10px; font-size:16px; background:var(--oat); }
-    .composer input:focus { outline:none; border-color:var(--lava); background:#fff; box-shadow:0 0 0 3px rgba(255,54,33,.12); }
-    .composer button { background:linear-gradient(180deg,var(--lava),var(--lava-dark)); color:#fff; border:none; border-radius:10px;
-                       padding:14px 28px; cursor:pointer; font-size:16px; font-weight:700; box-shadow:0 4px 12px rgba(255,54,33,.3); }
+    .composer { display:flex; gap:12px; align-items:stretch; }
+    .composer textarea { flex:1; padding:16px 18px; border:2px solid var(--line); border-radius:12px; font:inherit; font-size:22px;
+                       line-height:1.35; min-height:96px; resize:vertical; background:var(--oat); color:var(--navy); }
+    .composer textarea:focus { outline:none; border-color:var(--lava); background:#fff; box-shadow:0 0 0 3px rgba(255,54,33,.12); }
+    .composer button { background:linear-gradient(180deg,var(--lava),var(--lava-dark)); color:#fff; border:none; border-radius:12px;
+                       padding:14px 32px; cursor:pointer; font-size:18px; font-weight:700; box-shadow:0 4px 12px rgba(255,54,33,.3); }
     .composer button:disabled { opacity:.5; cursor:default; box-shadow:none; }
     .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; align-items:center; }
     .chips .lbl { font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--slate); margin-right:4px; }
@@ -44,18 +45,18 @@
     .cols { display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start; }
     .col { display:flex; flex-direction:column; gap:14px; }
     .col-head { border-radius:14px; padding:18px 22px; color:#fff; box-shadow:var(--shadow); }
-    .col.ctx .col-head { background:linear-gradient(135deg, var(--lava) 0%, #FF6A3D 100%); }
-    .col.none .col-head { background:linear-gradient(135deg, #4F6E79 0%, var(--slate) 100%); }
+    .col.ctx .col-head { background:linear-gradient(135deg, #008A5E 0%, var(--green) 100%); }
+    .col.none .col-head { background:linear-gradient(135deg, var(--navy-2) 0%, var(--navy) 100%); }
     .col-head h2 { margin:0; font-size:clamp(34px, 3.6vw, 60px); line-height:1.05; font-weight:800; letter-spacing:-.5px; }
     .col-head p { margin:8px 0 0; font-size:15px; opacity:.95; }
     .model { font-family:ui-monospace,Menlo,monospace; font-size:.9em; background:rgba(255,255,255,.2); border-radius:6px; padding:1px 6px; }
-    .log { display:flex; flex-direction:column; gap:12px; min-height:300px; max-height:58vh; overflow:auto; }
+    .log { display:flex; flex-direction:column; gap:12px; min-height:260px; max-height:62vh; overflow:auto; }
     .empty { margin:auto; text-align:center; color:var(--slate); font-size:13px; padding:40px 0; }
     .msg { padding:12px 16px; border-radius:14px; font-size:14px; line-height:1.5; }
     .msg.q { align-self:flex-end; max-width:90%; background:var(--navy); color:#fff; white-space:pre-wrap; border-bottom-right-radius:4px; }
     .msg.a { background:#fff; border:1px solid var(--line); border-bottom-left-radius:4px; }
-    .col.ctx .msg.a { border-left:4px solid var(--lava); }
-    .col.none .msg.a { border-left:4px solid var(--slate); background:#FBFBFA; }
+    .col.ctx .msg.a { border-left:4px solid var(--green); }
+    .col.none .msg.a { border-left:4px solid var(--navy); background:#FBFBFA; }
     .msg.err { color:var(--lava-dark); }
     .msg table { border-collapse:collapse; font-size:12px; margin:8px 0; }
     .msg th { background:var(--oat-2); }
@@ -66,16 +67,16 @@
     .trace ol { margin:0; padding-left:20px; }
     .trace li { margin:3px 0; }
     .trace q { font-style:italic; color:#33474E; }
-    .dots span { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--lava); margin-right:4px; animation:b 1.2s infinite ease-in-out; }
-    .col.none .dots span { background:var(--slate); }
+    .dots span { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--green); margin-right:4px; animation:b 1.2s infinite ease-in-out; }
+    .col.none .dots span { background:var(--navy); }
     .dots span:nth-child(2) { animation-delay:.15s; } .dots span:nth-child(3) { animation-delay:.3s; }
     @keyframes b { 0%,80%,100% { opacity:.25; transform:scale(.8);} 40% { opacity:1; transform:scale(1);} }
     .how h3 { margin:0 0 8px; font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; }
-    .col.ctx .how h3 { color:var(--lava); } .col.none .how h3 { color:var(--slate); }
+    .col.ctx .how h3 { color:#008A5E; } .col.none .how h3 { color:var(--navy); }
     .how ul { margin:0; padding-left:18px; } .how li { font-size:14px; line-height:1.5; margin-bottom:4px; }
     .how .flow { display:flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:12px; margin-top:10px; }
     .how .flow b { background:var(--navy); color:#fff; border-radius:6px; padding:4px 8px; font-weight:600; }
-    .how .flow b.l { background:var(--lava); } .how .flow b.g { background:var(--green); } .how .flow b.s { background:var(--slate); }
+    .how .flow b.l { background:#008A5E; } .how .flow b.g { background:var(--green); } .how .flow b.s { background:var(--slate); }
     .how .flow i { color:var(--slate); font-style:normal; }
     @media (max-width:1000px) { .cols { grid-template-columns:1fr; } }
   </style>
@@ -96,7 +97,7 @@
 <div class="page">
   <div class="card ask">
     <div class="composer">
-      <input id="q" placeholder="Ask a purchasing question. Both sides answer it." autocomplete="off" />
+      <textarea id="q" rows="2" placeholder="Ask a purchasing question. Both sides answer it."></textarea>
       <button id="send">Ask both</button>
     </div>
     <div class="chips" id="chips"><span class="lbl">Examples</span></div>
@@ -110,7 +111,6 @@
         <h2>With your context</h2>
         <p>Supervisor agent · <span class="model" data-model>…</span> + 2 Genie Agents + your SAP data</p>
       </div>
-      <div class="card log" id="log-supervisor"><div class="empty">The answer from your own data appears here.</div></div>
       <div class="card how">
         <h3>How it works</h3>
         <ul>
@@ -120,6 +120,7 @@
         </ul>
         <div class="flow"><b>Question</b><i>→</i><b class="l">Supervisor</b><i>→</i><b class="g">Genie Agents</b><i>→</i><b>SAP data</b><i>→</i><b>Answer</b></div>
       </div>
+      <div class="card log" id="log-supervisor"><div class="empty">The answer from your own data appears here.</div></div>
     </section>
 
     <section class="col none">
@@ -127,7 +128,6 @@
         <h2>No context</h2>
         <p>Normal ChatGPT-style chat · <span class="model" data-model>…</span> alone</p>
       </div>
-      <div class="card log" id="log-normal"><div class="empty">The answer without your data appears here.</div></div>
       <div class="card how">
         <h3>How it works</h3>
         <ul>
@@ -137,6 +137,7 @@
         </ul>
         <div class="flow"><b>Question</b><i>→</i><b class="s"><span data-model>AI model</span></b><i>→</i><b>Answer</b></div>
       </div>
+      <div class="card log" id="log-normal"><div class="empty">The answer without your data appears here.</div></div>
     </section>
   </div>
 </div>
@@ -174,7 +175,7 @@ const chips = document.getElementById("chips");
 SAMPLES.forEach(t => { const c = document.createElement("button"); c.className = "chip"; c.textContent = t;
   c.onclick = () => { q.value = t; askBoth(); }; chips.appendChild(c); });
 document.getElementById("reset").onclick = () => {
-  newSessions(); MODES.forEach(m => logOf(m).innerHTML = '<div class="empty">New conversation.</div>'); };
+  newSessions(); q.value = ""; MODES.forEach(m => logOf(m).innerHTML = '<div class="empty">New conversation.</div>'); };
 
 function bubble(m, cls, html) {
   const log = logOf(m); log.querySelector(".empty")?.remove();
@@ -205,7 +206,7 @@ function traceOf(m, msgs) {
 }
 
 async function askOne(m, text) {
-  bubble(m, "q", esc(text));
+  logOf(m).innerHTML = "";
   const wait = bubble(m, "a", `<span class="dots"><span></span><span></span><span></span></span>
     <span class="small">${m === "supervisor" ? "Asking the Genie Agents" : "Thinking"}… <span class="t">0</span> s</span>`);
   const t0 = Date.now(), timer = setInterval(() => wait.querySelector(".t").textContent = Math.round((Date.now() - t0) / 1000), 1000);
@@ -230,12 +231,12 @@ async function askOne(m, text) {
 
 async function askBoth() {
   const text = q.value.trim(); if (!text || send.disabled) return;
-  q.value = ""; send.disabled = true;
+  send.disabled = true;
   try { await Promise.all(MODES.map(m => askOne(m, text))); }
   finally { send.disabled = false; q.focus(); }
 }
 send.onclick = askBoth;
-q.addEventListener("keydown", e => { if (e.key === "Enter") askBoth(); });
+q.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askBoth(); } });
 </script>
 </body>
 </html>
