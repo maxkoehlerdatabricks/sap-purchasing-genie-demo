@@ -31,7 +31,8 @@ agentbricks deploy sap-supervisor --source /tmp/supervisor
 ## Calling it
 
 In a browser: open the app URL. `runtime/ui.py` + `ui/index.html` serve the **SAP Purchasing
-Assistant** page (no build step). It has two modes, sent as `input.mode`:
+Assistant** page (no build step). Each question goes to both modes at once and the answers
+show side by side ("With your context" | "No context"). The mode is sent as `input.mode`:
 
 * `supervisor` (default): the routing prompt plus both Genie Agent tools.
 * `normal`: the same model with no tools, no data and no instructions, like ChatGPT.

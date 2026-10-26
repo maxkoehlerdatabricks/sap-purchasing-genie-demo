@@ -458,24 +458,23 @@
       service principal that has CAN_RUN on both Genie Agents.</div>
     </li>
     <li><span class="click-label">CLICK</span> the app URL. It opens the <strong>SAP Purchasing Assistant</strong>.
-      <div class="show">Two modes at the top. <strong>Supervisor</strong> is the AI model <strong>with our
-      context</strong>: it knows our SAP purchasing data and asks two Genie Agents. <strong>Normal ChatGPT-style
-      chat</strong> is the same AI model <strong>without our context</strong>. The page names the model
-      (Claude Sonnet 4.5, <code class="inline">system.ai.claude-sonnet-4-5</code>). The panel on the right compares
-      both modes in a small table and explains in plain words how the supervisor works and how it was built.</div>
-      <div class="say">"Same AI model on both buttons. The only difference is the context. On the left it is wired
+      <div class="show">One question box on top, two columns below. Left, in large letters:
+      <strong>With your context</strong> (the supervisor agent: Claude Sonnet 4.5 + 2 Genie Agents + your SAP data).
+      Right: <strong>No context</strong> (the same model, Claude Sonnet 4.5, used like ChatGPT). Under each column a
+      three-line "How it works".</div>
+      <div class="say">"Same AI model on both sides. The only difference is the context. On the left it is wired
       to our experts and our governed data. On the right it is what you get from a public chatbot."</div>
     </li>
-    <li><span class="click-label">ASK</span> in <strong>Normal ChatGPT-style chat</strong> the first example:
+    <li><span class="click-label">CLICK</span> the first example chip:
       <span class="ask">Did we place purchase orders with suppliers that are the only source of a material and
-      carry delivery risk?</span>
-      <div class="show">A general answer in a few seconds. It says it has no access to our data and explains how
-      one could check it. The <strong>trace</strong> under the answer says: no Genie Agent asked, Claude Sonnet 4.5
-      answered from general knowledge only.</div>
+      carry delivery risk?</span> It goes to both columns at once.
+      <div class="show"><strong>No context</strong> answers in a few seconds: it has no access to our data and
+      explains how one could check it. Its trace: no Genie Agent asked, Claude Sonnet 4.5 answered from general
+      knowledge only.</div>
       <div class="say">"Helpful, but it does not know our suppliers. It cannot answer the actual question."</div>
     </li>
-    <li><span class="click-label">ASK</span> the same question in <strong>Supervisor</strong>.
-      <div class="show">The answer: yes, with the 13 single-sourced risky materials, the 5 suppliers and their
+    <li><span class="click-label">WAIT</span> for <strong>With your context</strong> (about 70 to 90 seconds).
+      <div class="show">The answer: yes, with the single-sourced risky materials, the 5 suppliers and their
       purchase orders. The <strong>trace</strong> under the answer reads like a to-do list:
       <br/>1. Asked Genie Agent <strong>Sourcing &amp; Supplier Risk</strong>: "Which suppliers are the only source
       for a material and also carry delivery risk?"
@@ -484,9 +483,8 @@
       <br/>3. Claude Sonnet 4.5 combined the answers.</div>
       <div class="say">"The business user just asks. The supervisor splits the question, asks each expert, passes
       the result of the first to the second, and combines the answers."</div>
-      <div class="tip">A supervisor answer takes about 70 to 90 seconds. Ask, then talk through
-      <code class="inline">agent.toml</code> while it runs. All four example chips need both Genie Agents, so any
-      of them shows the split.</div>
+      <div class="tip">Talk through <code class="inline">agent.toml</code> while it runs. All four example chips need
+      both Genie Agents, so any of them shows the split.</div>
     </li>
     <li><span class="click-label">SHOW</span> (optional) the MLflow experiment
       <strong>/Shared/agentbricks_traces/sap-purchasing-supervisor</strong> → Traces.
